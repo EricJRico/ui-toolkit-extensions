@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "displayName": "UI Toolkit Extensions",
     "description": "High-performance UI Toolkit extensions for Unity, including a zero-dependency stacked bar graph visualization.",
-    "unity": "2022.3",
+    "unity": "6000.0",
     "license": "Apache-2.0",
     "author": {
         "name": "Eric J Rico",
