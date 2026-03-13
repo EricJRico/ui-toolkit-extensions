@@ -50,9 +50,9 @@ namespace BarGraph
         // ── Interaction ───────────────────────────────────────────────────────
         [Header("Interaction")]
         public bool  EnableMouseZoomX = true;
-        public bool  EnableMouseZoomY = false;   // hold Shift to zoom Y
+        public bool  EnableMouseZoomY = false;
         public bool  EnableMousePan   = true;
-        public bool  EnableYPan       = false;   // hold Shift to pan Y
+        public bool  EnableYPan       = false;
         public bool  EnableSelection  = true;
         [Range(0.02f, 0.5f)]
         public float ZoomSpeed = 0.12f;

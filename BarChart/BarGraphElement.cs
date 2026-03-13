@@ -608,7 +608,18 @@ namespace BarGraph
             if (_viewState.IsDragSelecting && _viewState.DragRect.width > 1f)
                 DrawDragRect(p, _viewState.DragRect);
 
-            // 8 – Axes (on top of bars)
+            // 7b – Padding overdraw: re-fill the four padding strips with the
+            //      background colour.  The bar clamp prevents bars from drawing
+            //      above plotY (= PaddingTop), but the top Y-label is centred ON
+            //      plotY so its lower half sits inside the plot area.  Overpainting
+            //      the strips creates a clean frame that masks any bar tip that
+            //      touches a boundary and keeps label backgrounds opaque.
+            FillRect(p, _settings.BackgroundColor, 0,      0,      cr.width,           pT);
+            FillRect(p, _settings.BackgroundColor, 0,      plotY2, cr.width,           cr.height - plotY2);
+            FillRect(p, _settings.BackgroundColor, 0,      pT,     pL,                 plotH);
+            FillRect(p, _settings.BackgroundColor, plotX2, pT,     cr.width - plotX2,  plotH);
+
+            // 8 – Axes (on top of bars and overdraw)
             if (_settings.ShowAxes)
                 DrawAxes(p, plotX, plotX2, plotY, plotY2);
 
@@ -955,13 +966,24 @@ namespace BarGraph
 
         private void PositionLabels(float plotX, float plotW, float plotH, float plotY2)
         {
-            // Y-axis value labels
+            // Y-axis value labels.
+            // The visible Y range is determined by ZoomY and PanY — not just
+            // [MinValue, _effectiveMaxY].  From DrawDirectBars:
+            //   yScale  = plotH / _effectiveMaxY * ZoomY
+            //   yBottom = plotY2 + PanY * plotH
+            // → value at screen-y = (yBottom - y) / yScale
+            // → bottom edge (y=plotY2) : PanY * _effectiveMaxY / ZoomY
+            // → top    edge (y=plotY2-plotH) : (1+PanY) * _effectiveMaxY / ZoomY
+            float zoomY      = Mathf.Max(0.001f, _viewState.ZoomY);
+            float visibleMin = _viewState.PanY         * _effectiveMaxY / zoomY;
+            float visibleMax = (1f + _viewState.PanY)  * _effectiveMaxY / zoomY;
+
             for (int i = 0; i < _yLabels.Count; i++)
             {
                 Label lbl  = _yLabels[i];
                 int   cnt  = _yLabels.Count;
                 float t    = cnt > 1 ? (float)i / (cnt - 1) : 0f;
-                float val  = Mathf.Lerp(_settings.MinValue, _effectiveMaxY, t);
+                float val  = Mathf.Lerp(visibleMin, visibleMax, t);
                 float y    = plotY2 - t * plotH;
                 lbl.text   = _yFormatter(val);
                 lbl.style.left   = 0f;
@@ -1183,9 +1205,8 @@ namespace BarGraph
             float stride      = GetBarStrideBase();
             float visibleBars = stride > 0f
                 ? plotW / (stride * _viewState.ZoomX) : (float)_model.BarCount;
-            float visibleYF   = 1f / _viewState.ZoomY;
 
-            _viewState.ClampPan(visibleBars, _model.BarCount, visibleYF);
+            _viewState.ClampPan(visibleBars, _model.BarCount, _viewState.ZoomY);
         }
 
         private void NotifyViewChanged()

@@ -39,7 +39,7 @@ namespace BarGraph
         /// </summary>
         public float PanY = 0f;
 
-        public float MinZoomX =  0.1f;
+        public float MinZoomX =  1.0f;   // 1 = all bars fit; can't zoom out further
         public float MaxZoomX = 50.0f;
         public float MinZoomY =  0.1f;
         public float MaxZoomY = 20.0f;
@@ -88,10 +88,15 @@ namespace BarGraph
             PanY  = 0f;
         }
 
-        public void ClampPan(float visibleBars, float totalBars, float visibleYFraction)
+        public void ClampPan(float visibleBars, float totalBars, float zoomY)
         {
             PanX = Mathf.Clamp(PanX, 0f, Mathf.Max(0f, totalBars - visibleBars));
-            PanY = Mathf.Clamp(PanY, 0f, Mathf.Max(0f, 1f - visibleYFraction));
+            // maxPanY = zoomY - 1 so the tallest bar can always reach the top edge.
+            // Derivation: to place bar top (value=maxY) at plotY2-plotH:
+            //   yBottom - maxY*plotH/maxY*zoomY = plotY2-plotH
+            //   plotY2 + PanY*plotH - zoomY*plotH = plotY2-plotH
+            //   PanY = zoomY - 1
+            PanY = Mathf.Clamp(PanY, 0f, Mathf.Max(0f, zoomY - 1f));
         }
 
         public void EnsureSortCapacity(int count)

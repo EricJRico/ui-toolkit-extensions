@@ -15,5 +15,12 @@
         "chart",
         "visualization",
         "uitk"
+    ],
+    "samples": [
+        {
+            "displayName": "Bar Chart Demo",
+            "description": "Runtime demo with coroutine cycling through all BarGraph features, including a 10K+ bar stress test.",
+            "path": "Samples~/BarChartDemo"
+        }
     ]
 }

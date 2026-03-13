@@ -70,8 +70,10 @@ namespace BarGraph.Manipulators
             float newPanY    = _startPanY;
             if (_chart.Settings.EnableYPan)
             {
-                float plotH  = _chart.GetPlotHeight();
-                newPanY      = _startPanY + delta.y / Mathf.Max(1f, plotH);
+                float plotH = _chart.GetPlotHeight();
+                // delta.y is positive when dragging DOWN.
+                // Dragging down should show lower values → decrease PanY → subtract.
+                newPanY = _startPanY - delta.y / Mathf.Max(1f, plotH);
             }
 
             _chart.InternalSetPan(newPanX, newPanY);

@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -215,7 +214,7 @@ namespace BarGraph.Editor
             bar.Add(TbSep());
 
             // ── Zoom Y toggle ─────────────────────────────────────────────────
-            var zoomYToggle = new Toggle { value = _enableZoomY, tooltip = "Enable Shift+Scroll to zoom Y axis" };
+            var zoomYToggle = new Toggle { value = _enableZoomY, tooltip = "Enable Ctrl+Scroll to zoom Y axis (⌘+Scroll on macOS)" };
             zoomYToggle.RegisterValueChangedCallback(e =>
             {
                 _enableZoomY = e.newValue;
@@ -255,7 +254,7 @@ namespace BarGraph.Editor
             bar.Add(_statusZoom);
 
             // Keyboard shortcut hint (right-aligned)
-            var hint = new Label("Scroll=ZoomX  Shift+Scroll=ZoomY  Middle/Alt+Drag=Pan  Ctrl+Click=Multi-select");
+            var hint = new Label("Scroll=ZoomX  Ctrl+Scroll=ZoomY  Middle/Alt+Drag=Pan  Ctrl+Click=Multi-select");
             hint.style.fontSize       = 9;
             hint.style.color          = new Color(0.5f, 0.5f, 0.5f, 1f);
             hint.style.flexGrow       = 1;
@@ -513,4 +512,3 @@ namespace BarGraph.Editor
         }
     }
 }
-#endif
