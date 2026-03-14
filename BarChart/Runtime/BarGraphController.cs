@@ -39,6 +39,11 @@ namespace BarGraph.Runtime
         public UnityEngine.Events.UnityEvent<int>   OnBarClicked;
         public UnityEngine.Events.UnityEvent<int>   OnSelectionChanged;
 
+        // ── Domain-reload view-state persistence ─────────────────────────────
+
+        [SerializeField, HideInInspector]
+        private BarGraphViewSnapshot _viewSnapshot;
+
         // ── Runtime ──────────────────────────────────────────────────────────
 
         private UIDocument      _doc;
@@ -52,10 +57,20 @@ namespace BarGraph.Runtime
         {
             EnsureGraph();
             if (_generatePreview) SetPreviewData();
+
+            // Restore view state captured before the last domain reload
+            if (_viewSnapshot.IsValid)
+            {
+                _graph.RestoreViewSnapshot(_viewSnapshot);
+                _viewSnapshot = default;
+            }
         }
 
         private void OnDisable()
         {
+            if (_graph != null)
+                _viewSnapshot = _graph.CreateViewSnapshot();
+
             _graph?.RemoveFromHierarchy();
             _graph = null;
         }

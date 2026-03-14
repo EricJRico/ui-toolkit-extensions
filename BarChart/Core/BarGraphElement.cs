@@ -317,6 +317,82 @@ namespace BarGraph.Core
         }
 
         // ─────────────────────────────────────────────────────────────────────
+        //  Domain-reload snapshot (view state only — no data arrays)
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Captures the current view state (zoom, pan, sort, selection) into a
+        /// lightweight serializable struct.  Call from <c>OnDisable</c> before
+        /// domain reload and hold the result in a <c>[SerializeField]</c> field.
+        /// </summary>
+        public BarGraphViewSnapshot CreateViewSnapshot()
+        {
+            int[] selected;
+            if (_viewState.SelectedBars.Count > 0)
+            {
+                selected = new int[_viewState.SelectedBars.Count];
+                _viewState.SelectedBars.CopyTo(selected);
+            }
+            else
+            {
+                selected = Array.Empty<int>();
+            }
+
+            return new BarGraphViewSnapshot
+            {
+                ZoomX           = _viewState.ZoomX,
+                ZoomY           = _viewState.ZoomY,
+                PanX            = _viewState.PanX,
+                PanY            = _viewState.PanY,
+                SortMode        = _viewState.SortMode,
+                SortDescending  = _viewState.SortDescending,
+                FocusedBarIndex = _viewState.FocusedBarIndex,
+                SelectedBars    = selected,
+                IsValid         = true,
+            };
+        }
+
+        /// <summary>
+        /// Restores a previously captured view snapshot.  Call AFTER data has
+        /// been loaded (via <see cref="SetData"/>) so that sort maps and pan
+        /// clamping work against the correct bar count.
+        /// </summary>
+        public void RestoreViewSnapshot(BarGraphViewSnapshot snap)
+        {
+            if (!snap.IsValid) return;
+
+            _viewState.ZoomX          = Mathf.Clamp(snap.ZoomX, _viewState.MinZoomX, _viewState.MaxZoomX);
+            _viewState.ZoomY          = Mathf.Clamp(snap.ZoomY, _viewState.MinZoomY, _viewState.MaxZoomY);
+            _viewState.PanX           = snap.PanX;
+            _viewState.PanY           = snap.PanY;
+            _viewState.SortMode       = snap.SortMode;
+            _viewState.SortDescending = snap.SortDescending;
+            _viewState.SortDirty      = true;
+
+            // Clamp index-based state against actual bar count
+            int barCount = _model.BarCount;
+            _viewState.FocusedBarIndex =
+                (snap.FocusedBarIndex >= 0 && snap.FocusedBarIndex < barCount)
+                    ? snap.FocusedBarIndex : -1;
+
+            _viewState.SelectedBars.Clear();
+            if (snap.SelectedBars != null)
+            {
+                for (int i = 0; i < snap.SelectedBars.Length; i++)
+                {
+                    int idx = snap.SelectedBars[i];
+                    if (idx >= 0 && idx < barCount)
+                        _viewState.SelectedBars.Add(idx);
+                }
+            }
+
+            ClampViewState();
+            NotifyViewChanged();
+            FireSelectionChanged();
+            MarkDirtyRepaint();
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
         //  Internal geometry helpers (used by manipulators)
         // ─────────────────────────────────────────────────────────────────────
 
