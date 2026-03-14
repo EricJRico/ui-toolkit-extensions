@@ -68,6 +68,9 @@ namespace BarGraph.Core
         // LOD pixel buffer (grows, never shrinks)
         private LodPixel[] _lodBuf = new LodPixel[2048];
 
+        // Selection run buffer: pairs of (runStartDisp, runEndDispExclusive)
+        private readonly List<int> _selectionRuns = new List<int>(32);
+
         // ─────────────────────────────────────────────────────────────────────
         //  Label overlay pool
         // ─────────────────────────────────────────────────────────────────────
@@ -911,11 +914,12 @@ namespace BarGraph.Core
                 }
                 else
                 {
-                    // ── Normal mode: iterate VISIBLE bars only, O(visibleCount) ──
-                    // We invert the iteration (display range → Contains check) so
-                    // cost is bounded by screen width, not by selection size.
+                    // ── Normal mode ─────────────────────────────────────────
+                    float selY = plotY2 - plotH;
 
-                    // Fill pass
+                    // Fill pass — per-bar rects so highlight only covers bars,
+                    // not the gaps between them.  Single path + OddEven is
+                    // already correct (no alpha accumulation).
                     p.fillColor = _settings.SelectionFillColor;
                     p.BeginPath();
                     for (int dispIdx = startDisp; dispIdx < endDisp; dispIdx++)
@@ -924,21 +928,46 @@ namespace BarGraph.Core
                             ? _viewState.DisplayToData[dispIdx] : dispIdx;
                         if (!_viewState.SelectedBars.Contains(dataIdx)) continue;
                         float x = plotX + (dispIdx - _viewState.PanX) * stride;
-                        PathRect(p, x, plotY2 - plotH, barW, plotH);
+                        PathRect(p, x, selY, barW, plotH);
                     }
                     p.Fill(FillRule.OddEven);
 
-                    // Rim stroke pass
-                    p.strokeColor = _settings.SelectionRimColor;
-                    p.lineWidth   = 1.5f;
+                    // Rim stroke pass — merge contiguous selected bars into
+                    // runs to avoid per-bar stroke alpha accumulation that
+                    // makes selection appear more opaque at higher zoom.
+                    _selectionRuns.Clear();
+                    int runStart = -1;
                     for (int dispIdx = startDisp; dispIdx < endDisp; dispIdx++)
                     {
                         int dataIdx = dispIdx < _viewState.DisplayToData.Length
                             ? _viewState.DisplayToData[dispIdx] : dispIdx;
-                        if (!_viewState.SelectedBars.Contains(dataIdx)) continue;
-                        float x = plotX + (dispIdx - _viewState.PanX) * stride;
+                        bool selected = _viewState.SelectedBars.Contains(dataIdx);
+
+                        if (selected && runStart < 0)
+                            runStart = dispIdx;
+                        else if (!selected && runStart >= 0)
+                        {
+                            _selectionRuns.Add(runStart);
+                            _selectionRuns.Add(dispIdx);
+                            runStart = -1;
+                        }
+                    }
+                    if (runStart >= 0)
+                    {
+                        _selectionRuns.Add(runStart);
+                        _selectionRuns.Add(endDisp);
+                    }
+
+                    p.strokeColor = _settings.SelectionRimColor;
+                    p.lineWidth   = 1.5f;
+                    for (int i = 0; i < _selectionRuns.Count; i += 2)
+                    {
+                        int rs = _selectionRuns[i];
+                        int re = _selectionRuns[i + 1];
+                        float x = plotX + (rs - _viewState.PanX) * stride;
+                        float w = (re - rs - 1) * stride + barW;
                         p.BeginPath();
-                        PathRect(p, x, plotY2 - plotH, barW, plotH);
+                        PathRect(p, x, selY, w, plotH);
                         p.Stroke();
                     }
                 }
