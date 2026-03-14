@@ -1,8 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
+using BarGraph.Core;
+using BarGraph.Input;
+using BarGraph.Input.Handlers;
 
-namespace BarGraph
+namespace BarGraph.Runtime
 {
     /// <summary>
     /// MonoBehaviour wrapper for <see cref="BarGraphElement"/>.
@@ -126,6 +129,12 @@ namespace BarGraph
 
             _graph             = new BarGraphElement();
             _graph.style.flexGrow = 1;
+
+            _graph.SetInputSource(new BarGraphUIToolkitInput());
+            _graph.AddHandler(new BarGraphHoverHandler());
+            _graph.AddHandler(new BarGraphSelectionHandler());
+            _graph.AddHandler(new BarGraphPanHandler());
+            _graph.AddHandler(new BarGraphZoomHandler());
 
             VisualElement container = string.IsNullOrEmpty(_containerName)
                 ? _doc.rootVisualElement

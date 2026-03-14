@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-namespace BarGraph
+namespace BarGraph.Events
 {
     // ─────────────────────────────────────────────────────────────────────────
     //  Event arg structs (all readonly, live on the stack → zero heap alloc)

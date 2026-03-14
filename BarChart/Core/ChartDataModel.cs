@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace BarGraph
+namespace BarGraph.Core
 {
     /// <summary>
     /// Holds the canonical bar + segment data.

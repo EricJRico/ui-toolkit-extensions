@@ -2,6 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
+using BarGraph.Core;
+using BarGraph.Input;
+using BarGraph.Input.Handlers;
 
 namespace BarGraph.Demo
 {
@@ -133,6 +136,12 @@ namespace BarGraph.Demo
             g.style.minHeight  = minH;
             g.style.borderTopLeftRadius = g.style.borderTopRightRadius =
                 g.style.borderBottomLeftRadius = g.style.borderBottomRightRadius = 4;
+
+            g.SetInputSource(new BarGraphUIToolkitInput());
+            g.AddHandler(new BarGraphHoverHandler());
+            g.AddHandler(new BarGraphSelectionHandler());
+            g.AddHandler(new BarGraphPanHandler());
+            g.AddHandler(new BarGraphZoomHandler());
 
             // Pluggable formatter demo
             g.FormatYLabel = v => v >= 1000f ? $"{v / 1000f:F1}K" : $"{v:F0}";

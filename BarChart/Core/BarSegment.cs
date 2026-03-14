@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace BarGraph
+namespace BarGraph.Core
 {
     /// <summary>
     /// One coloured slice inside a stacked bar.

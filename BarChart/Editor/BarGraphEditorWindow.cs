@@ -2,6 +2,10 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using BarGraph.Core;
+using BarGraph.Events;
+using BarGraph.Input;
+using BarGraph.Input.Handlers;
 
 namespace BarGraph.Editor
 {
@@ -92,6 +96,12 @@ namespace BarGraph.Editor
             // ── Graph (fills remaining space) ─────────────────────────────────
             _graph = new BarGraphElement();
             _graph.style.flexGrow = 1;
+
+            _graph.SetInputSource(new BarGraphUIToolkitInput());
+            _graph.AddHandler(new BarGraphHoverHandler());
+            _graph.AddHandler(new BarGraphSelectionHandler());
+            _graph.AddHandler(new BarGraphPanHandler());
+            _graph.AddHandler(new BarGraphZoomHandler());
 
             // Wire events before adding to hierarchy
             _graph.HoverChanged     += OnHover;

@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace BarGraph
+namespace BarGraph.Core
 {
     /// <summary>All visual and behaviour settings for a <see cref="BarGraphElement"/>.</summary>
     [Serializable]

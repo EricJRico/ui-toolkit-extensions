@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace BarGraph
+namespace BarGraph.Core
 {
     /// <summary>
     /// Describes a single bar column.

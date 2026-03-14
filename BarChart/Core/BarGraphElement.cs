@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
-using BarGraph.Manipulators;
+using BarGraph.Events;
+using BarGraph.Input;
 
-namespace BarGraph
+namespace BarGraph.Core
 {
     /// <summary>
     /// High-performance stacked vertical bar graph for Unity UI Toolkit.
@@ -100,6 +101,12 @@ namespace BarGraph
         /// <summary>Fired after zoom or pan changes.</summary>
         public event Action<ViewChangedEventArgs>    ViewChanged;
 
+        // ── Input ─────────────────────────────────────────────────────────────
+
+        private readonly BarGraphEventBus       _eventBus = new BarGraphEventBus();
+        private          Manipulator            _inputSource;
+        private readonly List<IBarGraphHandler> _handlers = new List<IBarGraphHandler>();
+
         // ─────────────────────────────────────────────────────────────────────
         //  Construction
         // ─────────────────────────────────────────────────────────────────────
@@ -112,7 +119,6 @@ namespace BarGraph
             focusable      = true;
             tabIndex       = 0;
 
-            // Invisible label layer on top of the canvas
             _labelRoot = new VisualElement { name = "bar-graph__labels", pickingMode = PickingMode.Ignore };
             _labelRoot.style.position = Position.Absolute;
             _labelRoot.style.left     = 0;
@@ -123,28 +129,74 @@ namespace BarGraph
 
             generateVisualContent += OnGenerateVisualContent;
 
-            // Layout
             RegisterCallback<GeometryChangedEvent>(_ => { RebuildLabelPool(); MarkDirtyRepaint(); });
-
-            // Start the label-position scheduler only once the element is attached
-            // to a panel (schedule is unavailable before attachment).
-            // Labels must be positioned OUTSIDE generateVisualContent — setting
-            // style properties on child VisualElements from within a repaint
-            // callback invalidates layout mid-pass and can cause repaint loops.
             RegisterCallback<AttachToPanelEvent>(_ =>
                 schedule.Execute(FlushLabelPositions).Every(0));
 
-            // Interaction manipulators (registered in priority order)
-            this.AddManipulator(new HoverManipulator(this));
-            this.AddManipulator(new SelectionManipulator(this));
-            this.AddManipulator(new PanManipulator(this));
-            this.AddManipulator(new ZoomManipulator(this));
-
-            // Keyboard
             RegisterCallback<KeyDownEvent>(OnKeyDown);
-
-            // Data change → mark sort dirty and repaint
             _model.DataChanged += OnDataChanged;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        //  Input source and handler registration
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sets the input source that translates raw input into
+        /// <see cref="BarGraphEventBus"/> calls.  Replaces any existing source.
+        /// If the source implements <see cref="IBarGraphInputSource"/>, the
+        /// internal event bus is injected automatically — callers never need
+        /// to access it directly.
+        /// </summary>
+        public void SetInputSource(Manipulator inputSource)
+        {
+            if (_inputSource != null)
+                this.RemoveManipulator(_inputSource);
+
+            _inputSource = inputSource;
+
+            if (_inputSource != null)
+            {
+                if (_inputSource is IBarGraphInputSource src)
+                    src.Initialize(_eventBus);
+
+                this.AddManipulator(_inputSource);
+            }
+        }
+
+        /// <summary>
+        /// Adds a behaviour handler and registers it against the internal event bus.
+        /// If a handler of the same type is already registered it is replaced.
+        /// </summary>
+        public void AddHandler(IBarGraphHandler handler)
+        {
+            for (int i = 0; i < _handlers.Count; i++)
+            {
+                if (_handlers[i].GetType() == handler.GetType())
+                {
+                    _handlers[i].Unregister(_eventBus);
+                    _handlers[i] = handler;
+                    handler.Register(_eventBus, this);
+                    return;
+                }
+            }
+
+            _handlers.Add(handler);
+            handler.Register(_eventBus, this);
+        }
+
+        /// <summary>Removes and unregisters a handler by type.</summary>
+        public void RemoveHandler<T>() where T : IBarGraphHandler
+        {
+            for (int i = 0; i < _handlers.Count; i++)
+            {
+                if (_handlers[i] is T)
+                {
+                    _handlers[i].Unregister(_eventBus);
+                    _handlers.RemoveAt(i);
+                    return;
+                }
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -301,6 +353,21 @@ namespace BarGraph
                 ? _model.Bars[dataIndex].TotalValue : 0f;
             HoverChanged?.Invoke(new HoverChangedEventArgs(dataIndex, val));
             MarkDirtyRepaint();
+        }
+
+        /// <summary>
+        /// Converts a screen-space pixel delta into data-space pan offsets.
+        /// Absorbs the Y-axis inversion (screen Y-down vs chart Y-up) so that
+        /// callers can apply both axes with the same sign: <c>startPan + delta</c>.
+        /// </summary>
+        internal Vector2 ScreenDeltaToPanDelta(Vector2 screenDelta)
+        {
+            float barStride = GetBarStride();
+            float plotH     = GetPlotHeight();
+            return new Vector2(
+                -screenDelta.x / Mathf.Max(1f, barStride),
+                 screenDelta.y / Mathf.Max(1f, plotH)
+            );
         }
 
         internal void InternalSetPan(float panX, float panY)

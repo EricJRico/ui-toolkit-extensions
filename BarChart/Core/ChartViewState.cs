@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace BarGraph
+namespace BarGraph.Core
 {
     /// <summary>
     /// All mutable view and interaction state for one <see cref="BarGraphElement"/>.
