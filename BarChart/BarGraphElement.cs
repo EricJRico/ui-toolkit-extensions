@@ -689,7 +689,11 @@ namespace BarGraph
                 for (int s = 0; s < bar.SegmentCount; s++)
                 {
                     ref readonly BarSegment seg = ref segments[bar.SegmentStart + s];
-                    float segH = Mathf.Min(seg.Value * yScale, plotH);
+                    // Do NOT cap segH to plotH here. When ZoomY > 1 bars are taller
+                    // than the plot area, and the cap would prevent them from ever
+                    // reaching the top edge during Y-pan. Real clipping is done
+                    // correctly by drawTop/drawH a few lines below.
+                    float segH = seg.Value * yScale;
                     if (segH < 0.5f) { yBottom -= segH; continue; }
 
                     float yTop = yBottom - segH;
@@ -765,13 +769,20 @@ namespace BarGraph
                 LodPixel lp = _lodBuf[px];
                 if (lp.MaxValue <= 0f) continue;
 
-                float barH = Mathf.Min(lp.MaxValue * yScale, plotH);
-                if (barH < 0.5f) continue;
+                // Same reasoning as DrawDirectBars: don't cap to plotH here.
+                // Use the real uncapped height and clip to the plot boundary below.
+                float barH    = lp.MaxValue * yScale;
+                float yBottom = plotY2 + yOffset;
+                float yTop    = yBottom - barH;
+
+                // Clip to plot area
+                float drawTop = Mathf.Max(yTop,    plotY2 - plotH);
+                float drawBot = Mathf.Min(yBottom, plotY2);
+                float drawH   = drawBot - drawTop;
+                if (drawH < 0.5f) continue;
 
                 float x = plotX + px;
-                float y = plotY2 + yOffset - barH;
-
-                BatchRect(lp.Color, x, y, 1f, barH);
+                BatchRect(lp.Color, x, drawTop, 1f, drawH);
             }
 
             FlushBatches(p);
