@@ -132,7 +132,7 @@ namespace BarGraph.Core
 
             generateVisualContent += OnGenerateVisualContent;
 
-            RegisterCallback<GeometryChangedEvent>(_ => { RebuildLabelPool(); MarkDirtyRepaint(); });
+            RegisterCallback<GeometryChangedEvent>(_ => { EnsureLabelPool(); MarkDirtyRepaint(); });
             RegisterCallback<AttachToPanelEvent>(_ =>
                 schedule.Execute(FlushLabelPositions).Every(0));
 
@@ -1124,6 +1124,14 @@ namespace BarGraph.Core
         //  Label overlay
         // ─────────────────────────────────────────────────────────────────────
 
+        private void EnsureLabelPool()
+        {
+            int yCount = Mathf.Min(_settings.MaxYLabels + 1, _settings.GridLineCount + 1);
+            if (_yLabels.Count == yCount && _xLabels.Count == _settings.MaxXLabels)
+                return;
+            RebuildLabelPool();
+        }
+
         private void RebuildLabelPool()
         {
             _labelRoot.Clear();
@@ -1170,24 +1178,26 @@ namespace BarGraph.Core
                 float y    = plotY2 - t * plotH;
                 lbl.text   = _yFormatter(val);
                 lbl.style.left   = 0f;
-                lbl.style.top    = y - 7f;
-                lbl.style.width  = plotX - 4f;
+                lbl.style.top    = y - _settings.LabelHeight * 0.5f;
+                lbl.style.width  = plotX - _settings.YLabelGap;
                 lbl.style.unityTextAlign = new StyleEnum<TextAnchor>(TextAnchor.MiddleRight);
                 lbl.visible = true;
             }
 
-            // X-axis bar labels — only when bars are wide enough
+            // X-axis bar labels — show as many as fit without overlapping
             CalcViewSlice(plotW, out float stride, out _, out int startDisp, out int endDisp);
-            int   viewCnt = endDisp - startDisp;
-            bool  show    = stride >= 14f && viewCnt > 0;
+            int viewCnt    = endDisp - startDisp;
+            int showCount  = _settings.XLabelWidth > 0
+                ? Mathf.Min(_xLabels.Count, Mathf.FloorToInt(plotW / _settings.XLabelWidth))
+                : 0;
+            bool show = showCount > 0 && viewCnt > 0;
 
             for (int j = 0; j < _xLabels.Count; j++)
             {
                 Label lbl = _xLabels[j];
-                if (!show) { lbl.visible = false; continue; }
+                if (!show || j >= showCount) { lbl.visible = false; continue; }
 
-                int   cnt    = _xLabels.Count;
-                float step   = cnt > 1 ? (float)(viewCnt - 1) / (cnt - 1) : 0f;
+                float step = showCount > 1 ? (float)(viewCnt - 1) / (showCount - 1) : 0f;
                 int   dispIdx = Mathf.Clamp(startDisp + Mathf.RoundToInt(j * step), startDisp, endDisp - 1);
                 int   dataIdx = dispIdx < _viewState.DisplayToData.Length
                     ? _viewState.DisplayToData[dispIdx] : dispIdx;
@@ -1203,9 +1213,9 @@ namespace BarGraph.Core
 
                 float x  = plotX + (dispIdx - _viewState.PanX) * stride + stride * 0.5f;
                 lbl.text = text;
-                lbl.style.left   = x - 20f;
-                lbl.style.top    = plotY2 + 3f;
-                lbl.style.width  = 40f;
+                lbl.style.left   = x - _settings.XLabelWidth * 0.5f;
+                lbl.style.top    = plotY2 + _settings.XLabelOffsetY;
+                lbl.style.width  = _settings.XLabelWidth;
                 lbl.style.unityTextAlign = new StyleEnum<TextAnchor>(TextAnchor.UpperCenter);
                 lbl.visible = (x >= plotX && x <= plotX + plotW);
             }
@@ -1215,7 +1225,7 @@ namespace BarGraph.Core
         //  Sort index (lazy rebuild, O(N log N) only when dirty)
         // ─────────────────────────────────────────────────────────────────────
 
-        private void EnsureSortMap()
+        internal void EnsureSortMap()
         {
             if (!_viewState.SortDirty) return;
             int n = _model.BarCount;
@@ -1370,7 +1380,7 @@ namespace BarGraph.Core
         {
             RecalcBounds();
             _viewState.SortDirty = true;
-            RebuildLabelPool();
+            EnsureLabelPool();
             MarkDirtyRepaint();
         }
 
@@ -1480,7 +1490,7 @@ namespace BarGraph.Core
                 fontSize    = _settings.LabelFontSize,
                 color       = _settings.LabelColor,
                 overflow    = Overflow.Hidden,
-                height      = 14f,
+                height      = _settings.LabelHeight,
                 paddingLeft  = 0, paddingRight  = 0,
                 marginLeft   = 0, marginRight   = 0,
             }

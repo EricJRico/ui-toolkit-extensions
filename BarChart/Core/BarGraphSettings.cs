@@ -59,9 +59,13 @@ namespace BarGraph.Core
 
         // ── Labels ────────────────────────────────────────────────────────────
         [Header("Labels")]
-        public int MaxXLabels    = 12;
-        public int MaxYLabels    = 6;
-        public int LabelFontSize = 10;
+        public int   MaxXLabels    = 12;
+        public int   MaxYLabels    = 6;
+        public int   LabelFontSize = 10;
+        public float LabelHeight   = 14f;
+        public float XLabelWidth   = 40f;
+        public float XLabelOffsetY = 3f;
+        public float YLabelGap     = 4f;
 
         // ── Overlay ───────────────────────────────────────────────────────────
         [Header("Overlay")]

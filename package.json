@@ -18,9 +18,14 @@
     ],
     "samples": [
         {
-            "displayName": "Bar Chart Demo",
-            "description": "Runtime demo with coroutine cycling through all BarGraph features, including a 10K+ bar stress test.",
+            "displayName": "Bar Chart Gallery Demo",
+            "description": "Multi-panel runtime gallery showcasing all BarGraph features with per-panel controls, up to 1000 stacked segments, and live streaming.",
             "path": "Samples~/BarChartDemo"
+        },
+        {
+            "displayName": "Bar Chart Editor Window Demo",
+            "description": "EditorWindow gallery with animation playback, all dataset types, and up to 1000 stacked segments with HSL color rotation.",
+            "path": "Samples~/BarChartEditorWindowDemo"
         }
     ]
 }

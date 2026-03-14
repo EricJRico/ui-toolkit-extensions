@@ -67,8 +67,5 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f6e80668ab665a744a929dee5cae94a2, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BarGraph.Demo.BarGraphDemo
-  _showSideBySide: 1
+  m_EditorClassIdentifier: Assembly-CSharp::BarGraph.Demo.BarGraphGalleryDemo
   _showEventLog: 1
-  _stressBarCount: 10000
-  _stackedSegmentCount: 4
