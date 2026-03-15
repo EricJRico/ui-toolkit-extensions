@@ -11,12 +11,16 @@ namespace BarGraph.Core
     /// High-performance stacked vertical bar graph for Unity UI Toolkit.
     ///
     /// ── Performance model ────────────────────────────────────────────────────
-    ///  • All geometry is drawn via <c>Painter2D</c>.  No per-bar VisualElements.
-    ///  • Bars sharing the same <see cref="Color32"/> are batched into a SINGLE
-    ///    <c>BeginPath…Fill</c> call using struct-of-arrays <see cref="RectBatch"/>.
-    ///    Draw-call count = O(unique colours across all visible segments).
-    ///  • LOD path: when bar slot width &lt; 1 screen pixel the renderer switches
-    ///    to pixel-column mode — render cost is bounded by panel width, not bar count.
+    ///  • Bar geometry bypasses <c>Painter2D</c> entirely.  Quads are written
+    ///    directly via <c>MeshGenerationContext.Allocate()</c> in chunks of up to
+    ///    16 383 quads (65 532 vertices), with unlimited chunks per repaint.
+    ///    No tessellation overhead, no 65 535-vertex ceiling.
+    ///  • Segment-level LOD: sub-pixel segments are merged in a single O(n) pass,
+    ///    capping output to ~plotHeight rects per bar regardless of segment count.
+    ///  • Bar-level LOD: when bar slot width &lt; 1 screen pixel the renderer
+    ///    switches to pixel-column mode — cost bounded by panel width, not bar count.
+    ///  • Chrome (grid, axes, highlights, drag rect) still uses <c>Painter2D</c>
+    ///    since vertex counts are trivially bounded.
     ///  • Backing arrays grow (double) but never shrink → zero GC in steady state.
     ///  • Label pool: fixed-size <see cref="Label"/> pool repositioned each repaint.
     ///  • Sort index is rebuilt lazily only when <see cref="ChartViewState.SortDirty"/> is set.
@@ -61,9 +65,10 @@ namespace BarGraph.Core
         //  Per-frame zero-GC render buffers
         // ─────────────────────────────────────────────────────────────────────
 
-        // Per-colour rect batches (key = Color32 avoids float precision issues)
-        private readonly Dictionary<Color32, RectBatch> _batches    = new Dictionary<Color32, RectBatch>(64);
-        private readonly List<Color32>                  _batchOrder = new List<Color32>(64);
+        // Bar quads written by DrawDirectBars / DrawLodBars, flushed via
+        // MeshGenerationContext.Allocate().  Grows via doubling, never shrinks.
+        private QuadData[] _quadBuf = new QuadData[4096];
+        private int        _quadCount;
 
         // LOD pixel buffer (grows, never shrinks)
         private LodPixel[] _lodBuf = new LodPixel[2048];
@@ -711,7 +716,9 @@ namespace BarGraph.Core
             if (_settings.ShowGrid && _settings.GridLineCount > 0)
                 DrawGrid(p, plotX, plotX2, plotY, plotY2, plotH);
 
-            // 4 – Primary bars (stacked, colour-batched, LOD-aware)
+            // 4 – Primary bars (stacked, segment-LOD, direct mesh)
+            _quadCount = 0;   // Reset quad buffer for this repaint
+
             if (_model.BarCount > 0)
             {
                 CalcViewSlice(plotW, out float stride, out float barW,
@@ -721,10 +728,10 @@ namespace BarGraph.Core
                 if (viewCount > 0)
                 {
                     if (stride >= 1f)
-                        DrawDirectBars(p, startDisp, endDisp, plotX, plotY2, stride, barW,
+                        DrawDirectBars(startDisp, endDisp, plotX, plotY2, stride, barW,
                                        plotH, _model, false, 1f);
                     else
-                        DrawLodBars(p, startDisp, endDisp, plotX, plotY2, plotW, plotH,
+                        DrawLodBars(startDisp, endDisp, plotX, plotY2, plotW, plotH,
                                     _model, 1f);
                 }
             }
@@ -739,13 +746,18 @@ namespace BarGraph.Core
                 if (viewCount > 0)
                 {
                     if (stride >= 1f)
-                        DrawDirectBars(p, startDisp, endDisp, plotX, plotY2, stride, barW,
+                        DrawDirectBars(startDisp, endDisp, plotX, plotY2, stride, barW,
                                        plotH, _model, true, _settings.OverlayOpacity);
                     else
-                        DrawLodBars(p, startDisp, endDisp, plotX, plotY2, plotW, plotH,
+                        DrawLodBars(startDisp, endDisp, plotX, plotY2, plotW, plotH,
                                     _model, _settings.OverlayOpacity);
                 }
             }
+
+            // Flush all accumulated bar quads to the GPU via direct mesh allocation.
+            // This bypasses Painter2D entirely — no tessellation, no vertex ceiling.
+            if (_quadCount > 0)
+                FlushQuads(mgc);
 
             // 6 – Selection & hover highlights
             DrawHighlights(p, plotX, plotY2, plotH);
@@ -804,16 +816,11 @@ namespace BarGraph.Core
         // ─────────────────────────────────────────────────────────────────────
 
         private void DrawDirectBars(
-            Painter2D p,
             int startDisp, int endDisp,
             float plotX, float plotY2,
             float stride, float barW, float plotH,
             ChartDataModel model, bool useOverlay, float alpha)
         {
-            // Clear batch buckets without reallocating list instances
-            foreach (var kv in _batches) kv.Value.Clear();
-            _batchOrder.Clear();
-
             BarEntry[]   bars     = useOverlay ? model.OverlayBars     : model.Bars;
             BarSegment[] segments = useOverlay ? model.OverlaySegments : model.Segments;
             int          barCount = useOverlay ? model.OverlayBarCount  : model.BarCount;
@@ -822,6 +829,7 @@ namespace BarGraph.Core
             float yScale = plotH / _effectiveMaxY * _viewState.ZoomY;
             // PanY shifts the bottom of the Y range
             float yOffset = _viewState.PanY * plotH;
+            float plotTop = plotY2 - plotH;   // top edge of plot area
 
             for (int dispIdx = startDisp; dispIdx < endDisp; dispIdx++)
             {
@@ -832,32 +840,103 @@ namespace BarGraph.Core
                 float x       = plotX + (dispIdx - _viewState.PanX) * stride;
                 float yBottom = plotY2 + yOffset;   // +yOffset shifts range up when panned
 
+                // ── Segment-level LOD merge state (zero allocation) ─────────
+                // When consecutive segments are each < 1 px tall, accumulate
+                // their heights and emit one merged rect using the dominant
+                // colour (largest-value segment wins — matches DrawLodBars
+                // strategy).  This caps output to ~plotH rects per bar
+                // regardless of segment count.
+                float   mergeH      = 0f;
+                Color32 mergeColor  = default;
+                float   mergeDomVal = 0f;
+
                 for (int s = 0; s < bar.SegmentCount; s++)
                 {
                     ref readonly BarSegment seg = ref segments[bar.SegmentStart + s];
                     // Do NOT cap segH to plotH here. When ZoomY > 1 bars are taller
                     // than the plot area, and the cap would prevent them from ever
                     // reaching the top edge during Y-pan. Real clipping is done
-                    // correctly by drawTop/drawH a few lines below.
+                    // correctly by drawTop/drawH below.
                     float segH = seg.Value * yScale;
-                    if (segH < 0.5f) { yBottom -= segH; continue; }
 
+                    if (segH < 1f)
+                    {
+                        // Sub-pixel segment → accumulate into merge buffer.
+                        Color32 c = ResolveSegmentColor(seg.Color, alpha);
+                        if (seg.Value > mergeDomVal)
+                        {
+                            mergeDomVal = seg.Value;
+                            mergeColor  = c;
+                        }
+                        mergeH += segH;
+
+                        // Flush the merge buffer when accumulated height reaches 1 px.
+                        if (mergeH >= 1f)
+                        {
+                            float mYTop = yBottom - mergeH;
+                            if (mYTop < plotY2 && yBottom > plotTop)
+                            {
+                                float drawTop = Mathf.Max(mYTop, plotTop);
+                                float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
+                                if (drawH >= 0.5f)
+                                    AddQuad(mergeColor, x, drawTop, barW, drawH);
+                            }
+                            yBottom     = mYTop;
+                            mergeH      = 0f;
+                            mergeDomVal = 0f;
+                            mergeColor  = default;
+
+                            if (yBottom <= plotTop) break;
+                        }
+                        continue;
+                    }
+
+                    // ≥ 1 px segment: flush any pending merge buffer first.
+                    if (mergeH > 0f)
+                    {
+                        float mYTop = yBottom - mergeH;
+                        if (mYTop < plotY2 && yBottom > plotTop)
+                        {
+                            float drawTop = Mathf.Max(mYTop, plotTop);
+                            float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
+                            if (drawH >= 0.5f)
+                                AddQuad(mergeColor, x, drawTop, barW, drawH);
+                        }
+                        yBottom     = mYTop;
+                        mergeH      = 0f;
+                        mergeDomVal = 0f;
+                        mergeColor  = default;
+
+                        if (yBottom <= plotTop) break;
+                    }
+
+                    // Emit this segment as its own rect (existing logic).
                     float yTop = yBottom - segH;
-                    if (yTop  >= plotY2) { yBottom = yTop; continue; }   // below visible
-                    if (yBottom <= plotY2 - plotH) break;                // above visible
+                    if (yTop  >= plotY2)  { yBottom = yTop; continue; }   // below visible
+                    if (yBottom <= plotTop) break;                         // above visible
 
-                    // Clamp to plot area
-                    float drawTop = Mathf.Max(yTop, plotY2 - plotH);
-                    float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
-                    if (drawH < 0.5f) { yBottom = yTop; continue; }
+                    float sDrawTop = Mathf.Max(yTop, plotTop);
+                    float sDrawH   = Mathf.Min(yBottom, plotY2) - sDrawTop;
+                    if (sDrawH < 0.5f) { yBottom = yTop; continue; }
 
-                    Color32 c = ResolveSegmentColor(seg.Color, alpha);
-                    BatchRect(c, x, drawTop, barW, drawH);
+                    Color32 sc = ResolveSegmentColor(seg.Color, alpha);
+                    AddQuad(sc, x, sDrawTop, barW, sDrawH);
                     yBottom = yTop;
                 }
-            }
 
-            FlushBatches(p);
+                // Flush any remaining merge buffer after the segment loop.
+                if (mergeH > 0f)
+                {
+                    float mYTop = yBottom - mergeH;
+                    if (mYTop < plotY2 && yBottom > plotTop)
+                    {
+                        float drawTop = Mathf.Max(mYTop, plotTop);
+                        float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
+                        if (drawH >= 0.5f)
+                            AddQuad(mergeColor, x, drawTop, barW, drawH);
+                    }
+                }
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -865,7 +944,6 @@ namespace BarGraph.Core
         // ─────────────────────────────────────────────────────────────────────
 
         private void DrawLodBars(
-            Painter2D p,
             int startDisp, int endDisp,
             float plotX, float plotY2,
             float plotW, float plotH,
@@ -904,9 +982,6 @@ namespace BarGraph.Core
                 }
             }
 
-            foreach (var kv in _batches) kv.Value.Clear();
-            _batchOrder.Clear();
-
             float yScale  = plotH / _effectiveMaxY * _viewState.ZoomY;
             float yOffset = _viewState.PanY * plotH;
 
@@ -928,10 +1003,8 @@ namespace BarGraph.Core
                 if (drawH < 0.5f) continue;
 
                 float x = plotX + px;
-                BatchRect(lp.Color, x, drawTop, 1f, drawH);
+                AddQuad(lp.Color, x, drawTop, 1f, drawH);
             }
-
-            FlushBatches(p);
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1415,41 +1488,86 @@ namespace BarGraph.Core
         }
 
         // ─────────────────────────────────────────────────────────────────────
-        //  Batch helpers (struct-of-arrays, zero GC)
+        //  Direct mesh quad buffer (zero GC, bypasses Painter2D tessellator)
         // ─────────────────────────────────────────────────────────────────────
 
-        private void BatchRect(Color32 color, float x, float y, float w, float h)
+        private void AddQuad(Color32 color, float x, float y, float w, float h)
         {
-            if (!_batches.TryGetValue(color, out RectBatch batch))
-            {
-                // First time this colour is ever seen: create the batch.
-                batch = new RectBatch();
-                _batches[color] = batch;
-            }
+            if (_quadCount == _quadBuf.Length)
+                Array.Resize(ref _quadBuf, _quadBuf.Length * 2);
 
-            // Add to draw-order the FIRST time this colour is used in the
-            // current frame (Count == 0 after the per-frame Clear call).
-            // We cannot rely on TryGetValue failing here: _batches retains its
-            // keys across repaints — only Count is reset in DrawDirectBars.
-            // Without this check, _batchOrder stays empty on every repaint
-            // after the first, FlushBatches draws nothing, and all bars vanish.
-            if (batch.Count == 0)
-                _batchOrder.Add(color);
-
-            batch.Add(x, y, w, h);
+            _quadBuf[_quadCount++] = new QuadData { X = x, Y = y, W = w, H = h, Color = color };
         }
 
-        private void FlushBatches(Painter2D p)
+        /// <summary>
+        /// Writes all buffered quads to the GPU via chunked
+        /// <see cref="MeshGenerationContext.Allocate"/> calls.
+        /// Each quad = 4 vertices + 6 indices.  Max 16 383 quads per chunk
+        /// (65 532 vertices, under the 65 535 UInt16 index limit).
+        /// Multiple chunks per element are supported — no ceiling on total quads.
+        /// </summary>
+        private void FlushQuads(MeshGenerationContext mgc)
         {
-            foreach (Color32 c in _batchOrder)
+            const int MAX_QUADS_PER_CHUNK = 16383;   // 65 532 / 4
+            const int VERTS_PER_QUAD  = 4;
+            const int INDICES_PER_QUAD = 6;
+
+            int offset = 0;
+            while (offset < _quadCount)
             {
-                p.fillColor = (Color)c;
-                p.BeginPath();
-                RectBatch b = _batches[c];
-                for (int k = 0; k < b.Count; k++)
-                    PathRect(p, b.Xs[k], b.Ys[k], b.Ws[k], b.Hs[k]);
-                p.Fill(FillRule.OddEven);
+                int chunkQuads = Math.Min(MAX_QUADS_PER_CHUNK, _quadCount - offset);
+                int vertCount  = chunkQuads * VERTS_PER_QUAD;
+                int idxCount   = chunkQuads * INDICES_PER_QUAD;
+
+                // Pass Texture2D.whiteTexture so that texture × tint = tint.
+                // Must remap UVs into uvRegion in case the atlas repacks it.
+                MeshWriteData mwd = mgc.Allocate(vertCount, idxCount, Texture2D.whiteTexture);
+                Vector2 uv = new Vector2(
+                    mwd.uvRegion.x + mwd.uvRegion.width  * 0.5f,
+                    mwd.uvRegion.y + mwd.uvRegion.height * 0.5f);
+
+                for (int i = 0; i < chunkQuads; i++)
+                {
+                    ref QuadData q = ref _quadBuf[offset + i];
+                    ushort vi = (ushort)(i * 4);
+
+                    // Four corners: TL, TR, BR, BL
+                    mwd.SetNextVertex(new Vertex
+                    {
+                        position = new Vector3(q.X,       q.Y,       Vertex.nearZ),
+                        tint     = q.Color,
+                        uv       = uv
+                    });
+                    mwd.SetNextVertex(new Vertex
+                    {
+                        position = new Vector3(q.X + q.W, q.Y,       Vertex.nearZ),
+                        tint     = q.Color,
+                        uv       = uv
+                    });
+                    mwd.SetNextVertex(new Vertex
+                    {
+                        position = new Vector3(q.X + q.W, q.Y + q.H, Vertex.nearZ),
+                        tint     = q.Color,
+                        uv       = uv
+                    });
+                    mwd.SetNextVertex(new Vertex
+                    {
+                        position = new Vector3(q.X,       q.Y + q.H, Vertex.nearZ),
+                        tint     = q.Color,
+                        uv       = uv
+                    });
+
+                    // Two triangles: TL-TR-BR, TL-BR-BL
+                    mwd.SetNextIndex(vi);
+                    mwd.SetNextIndex((ushort)(vi + 1));
+                    mwd.SetNextIndex((ushort)(vi + 2));
+                    mwd.SetNextIndex(vi);
+                    mwd.SetNextIndex((ushort)(vi + 2));
+                    mwd.SetNextIndex((ushort)(vi + 3));
+                }
+                offset += chunkQuads;
             }
+            _quadCount = 0;
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1524,34 +1642,13 @@ namespace BarGraph.Core
         }
 
         /// <summary>
-        /// Struct-of-arrays for batched bar rectangles.
-        /// Four parallel arrays stay cache-friendly; no boxing; grows via doubling.
-        /// One instance per unique colour, reused across frames.
+        /// Lightweight quad descriptor: position, size, and colour.
+        /// Buffered by <see cref="AddQuad"/>, flushed to GPU by <see cref="FlushQuads"/>.
         /// </summary>
-        private sealed class RectBatch
+        private struct QuadData
         {
-            public float[] Xs = new float[64];
-            public float[] Ys = new float[64];
-            public float[] Ws = new float[64];
-            public float[] Hs = new float[64];
-            public int Count;
-
-            public void Clear() => Count = 0;
-
-            public void Add(float x, float y, float w, float h)
-            {
-                if (Count == Xs.Length) Grow();
-                Xs[Count] = x; Ys[Count] = y;
-                Ws[Count] = w; Hs[Count] = h;
-                Count++;
-            }
-
-            private void Grow()
-            {
-                int n = Xs.Length * 2;
-                Array.Resize(ref Xs, n); Array.Resize(ref Ys, n);
-                Array.Resize(ref Ws, n); Array.Resize(ref Hs, n);
-            }
+            public float   X, Y, W, H;
+            public Color32 Color;
         }
     }
 }
