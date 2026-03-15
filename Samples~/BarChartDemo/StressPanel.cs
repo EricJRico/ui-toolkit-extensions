@@ -9,7 +9,7 @@ namespace BarGraph.Demo
     /// Pushes the bar graph to its limits with tens of thousands of bars,
     /// coloured by a four-stop gradient.
     /// </summary>
-    sealed class StressPanel : DemoPanel
+    public sealed class StressPanel : DemoPanel
     {
         private int _barCount = 10000;
 
@@ -25,6 +25,7 @@ namespace BarGraph.Demo
 
             AddControl(MakeButton("Regenerate", Regenerate));
             AddSortToggle();
+            AddZoomYToggle();
             AddResetViewButton();
 
             Regenerate();

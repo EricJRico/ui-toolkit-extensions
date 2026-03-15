@@ -1,13 +1,17 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 using BarGraph.Core;
+using BarGraph.Demo;
+using BarGraph.Events;
 
 namespace BarGraph.EditorDemo
 {
     /// <summary>
     /// Multi-panel EditorWindow gallery showcasing all BarGraph features.
+    /// Hosts the same <see cref="DemoPanel"/> instances used by the runtime demo.
     /// Open via:  Window > BarGraph > Bar Graph Gallery
     ///
     /// Interaction (per panel)
@@ -39,16 +43,17 @@ namespace BarGraph.EditorDemo
         }
 
         // ── Serialized state (survives domain reload) ───────────────────────
-        [SerializeField] private List<GalleryPanelState> _panelStates;
+        [SerializeField] private List<BarGraphViewSnapshot> _snapshots;
         [SerializeField] private bool  _animating;
         [SerializeField] private float _animationSpeed = 1f;
 
         // ── Transient ───────────────────────────────────────────────────────
-        private List<GalleryPanel> _panels;
-        private GalleryAnimator    _animator;
-        private VisualElement      _galleryContainer;
-        private Label              _globalStatus;
-        private Button             _playPauseBtn;
+        private List<DemoPanel> _panels;
+        private VisualElement   _galleryContainer;
+        private Label           _eventLog;
+        private Button          _playPauseBtn;
+        private double          _lastTime;
+        private readonly Queue<string> _logLines = new Queue<string>(8);
 
         // ── Lifecycle ───────────────────────────────────────────────────────
 
@@ -57,46 +62,63 @@ namespace BarGraph.EditorDemo
             rootVisualElement.Clear();
             BuildUI();
 
-            // First open: create default 6-panel gallery
-            if (_panelStates == null || _panelStates.Count == 0)
-                _panelStates = CreateDefaultPanelStates();
-
-            // Rebuild panels from state
-            _panels = new List<GalleryPanel>();
-            foreach (var state in _panelStates)
+            // Create panels (same as runtime demo)
+            _panels = new List<DemoPanel>
             {
-                var panel = new GalleryPanel(state);
-                _galleryContainer.Add(panel.BuildUI());
-                panel.RefreshData();
-                panel.RestoreSnapshot(state);
-                _panels.Add(panel);
+                new SinePanel(),
+                new RandomPanel(),
+                new GaussianPanel(),
+                new StackedPanel(),
+                new StressPanel(),
+                new LiveFeedPanel(),
+            };
+
+            for (int i = 0; i < _panels.Count; i++)
+            {
+                var panel = _panels[i];
+                _galleryContainer.Add(panel.Card);
+                WireEvents(panel);
+
+                // Restore view snapshot from domain reload
+                if (_snapshots != null && i < _snapshots.Count && _snapshots[i].IsValid)
+                    panel.Graph.RestoreViewSnapshot(_snapshots[i]);
             }
 
-            // Animator
-            _animator = new GalleryAnimator(_panels);
-            _animator.Speed = _animationSpeed;
-            if (_animating)
-                _animator.Play();
-
-            UpdatePlayPauseLabel();
+            _lastTime = EditorApplication.timeSinceStartup;
         }
 
         private void OnDisable()
         {
-            // Capture snapshots for domain reload
+            // Capture view snapshots for domain reload
             if (_panels != null)
             {
-                _panelStates = new List<GalleryPanelState>();
+                _snapshots = new List<BarGraphViewSnapshot>();
                 foreach (var panel in _panels)
-                    _panelStates.Add(panel.CreateSnapshot());
+                    _snapshots.Add(panel.Graph.CreateViewSnapshot());
             }
-
-            _animator?.Stop();
         }
 
         private void Update()
         {
-            if (_animator != null && _animator.Tick())
+            if (_panels == null) return;
+
+            double now = EditorApplication.timeSinceStartup;
+            float dt = (float)(now - _lastTime);
+            _lastTime = now;
+
+            // Clamp dt to avoid huge jumps after long pauses
+            if (dt > 0.1f) dt = 0.1f;
+
+            float scaledDt = dt * _animationSpeed;
+
+            bool dirty = false;
+            foreach (var panel in _panels)
+            {
+                panel.OnUpdate(_animating ? scaledDt : dt);
+                dirty = true;
+            }
+
+            if (dirty)
                 Repaint();
         }
 
@@ -126,7 +148,10 @@ namespace BarGraph.EditorDemo
             };
             scroll.Add(_galleryContainer);
 
-            // Global status bar
+            // Event log
+            BuildEventLog(root);
+
+            // Status bar
             root.Add(BuildStatusBar());
         }
 
@@ -166,9 +191,7 @@ namespace BarGraph.EditorDemo
             {
                 _animating = !_animating;
                 if (_animating)
-                    _animator?.Play();
-                else
-                    _animator?.Pause();
+                    _lastTime = EditorApplication.timeSinceStartup;
                 UpdatePlayPauseLabel();
             });
             bar.Add(_playPauseBtn);
@@ -176,7 +199,6 @@ namespace BarGraph.EditorDemo
             bar.Add(TbButton("\u23F9 Stop", () =>
             {
                 _animating = false;
-                _animator?.Stop();
                 UpdatePlayPauseLabel();
             }));
 
@@ -184,20 +206,16 @@ namespace BarGraph.EditorDemo
             var speedSlider = new Slider(0.1f, 5f) { value = _animationSpeed };
             speedSlider.style.width       = 80;
             speedSlider.style.marginRight = 4;
-            speedSlider.RegisterValueChangedCallback(e =>
-            {
-                _animationSpeed = e.newValue;
-                if (_animator != null) _animator.Speed = _animationSpeed;
-            });
+            speedSlider.RegisterValueChangedCallback(e => _animationSpeed = e.newValue);
             bar.Add(speedSlider);
 
             bar.Add(TbSep());
 
             // Data controls
-            bar.Add(TbButton("Randomize All", () =>
+            bar.Add(TbButton("Regenerate All", () =>
             {
                 if (_panels == null) return;
-                foreach (var p in _panels) p.RefreshData();
+                foreach (var p in _panels) p.Regenerate();
             }));
 
             bar.Add(TbButton("Reset All Views", () =>
@@ -207,6 +225,34 @@ namespace BarGraph.EditorDemo
             }));
 
             return bar;
+        }
+
+        private void BuildEventLog(VisualElement root)
+        {
+            var logBox = new VisualElement();
+            logBox.style.backgroundColor = new Color(0.04f, 0.04f, 0.06f, 1f);
+            logBox.style.marginTop       = 4;
+            logBox.style.marginLeft      = 6;
+            logBox.style.marginRight     = 6;
+            logBox.style.paddingTop      = 4;
+            logBox.style.paddingBottom   = 4;
+            logBox.style.paddingLeft     = 6;
+            logBox.style.paddingRight    = 6;
+            logBox.style.height          = 60f;
+            logBox.style.borderTopLeftRadius = logBox.style.borderTopRightRadius =
+                logBox.style.borderBottomLeftRadius = logBox.style.borderBottomRightRadius = 4;
+            root.Add(logBox);
+
+            _eventLog = new Label("Events will appear here\u2026")
+            {
+                style =
+                {
+                    fontSize   = 9,
+                    color      = new Color(0.6f, 0.8f, 0.6f, 1f),
+                    whiteSpace = WhiteSpace.Normal
+                }
+            };
+            logBox.Add(_eventLog);
         }
 
         private VisualElement BuildStatusBar()
@@ -226,7 +272,7 @@ namespace BarGraph.EditorDemo
                 }
             };
 
-            _globalStatus = new Label("6 panels \u2014 Scroll=ZoomX  Shift+Scroll=ZoomY  Middle/Alt+Drag=Pan  Ctrl+Click=Multi-select")
+            bar.Add(new Label("6 panels \u2014 Scroll=ZoomX  Shift+Scroll=ZoomY  Middle/Alt+Drag=Pan  Ctrl+Click=Multi-select")
             {
                 style =
                 {
@@ -234,8 +280,7 @@ namespace BarGraph.EditorDemo
                     color      = new Color(0.5f, 0.5f, 0.5f, 1f),
                     flexGrow   = 1
                 }
-            };
-            bar.Add(_globalStatus);
+            });
 
             return bar;
         }
@@ -246,19 +291,22 @@ namespace BarGraph.EditorDemo
                 _playPauseBtn.text = _animating ? "\u23F8 Pause" : "\u25B6 Play";
         }
 
-        // ── Default panel states ────────────────────────────────────────────
+        // ── Events ──────────────────────────────────────────────────────────
 
-        private static List<GalleryPanelState> CreateDefaultPanelStates()
+        private void WireEvents(DemoPanel panel)
         {
-            return new List<GalleryPanelState>
-            {
-                new GalleryPanelState { Preset = DatasetPreset.SineWave,   BarCount = 120,   SegmentCount = 1  },
-                new GalleryPanelState { Preset = DatasetPreset.Random,     BarCount = 80,    SegmentCount = 1  },
-                new GalleryPanelState { Preset = DatasetPreset.Gaussian,   BarCount = 80,    SegmentCount = 1  },
-                new GalleryPanelState { Preset = DatasetPreset.Stacked,    BarCount = 60,    SegmentCount = 4  },
-                new GalleryPanelState { Preset = DatasetPreset.StressTest, BarCount = 10000, SegmentCount = 1  },
-                new GalleryPanelState { Preset = DatasetPreset.ManyStacks, BarCount = 40,    SegmentCount = 100 },
-            };
+            var name = panel.Title;
+            panel.Graph.BarClicked       += a => Log($"[{name}] BarClicked  data={a.DataIndex} val={a.TotalValue:F1}");
+            panel.Graph.HoverChanged     += a => { if (a.DataIndex >= 0) Log($"[{name}] Hover  bar={a.DataIndex}"); };
+            panel.Graph.SelectionChanged += a => Log($"[{name}] Selection  count={a.SelectedDataIndices.Count}");
+            panel.Graph.DragCompleted    += a => Log($"[{name}] DragDone  selected={a.SelectedDataIndices.Count}");
+        }
+
+        private void Log(string msg)
+        {
+            _logLines.Enqueue(msg);
+            while (_logLines.Count > 5) _logLines.Dequeue();
+            if (_eventLog != null) _eventLog.text = string.Join("\n", _logLines);
         }
 
         // ── Toolbar helpers ─────────────────────────────────────────────────
@@ -274,7 +322,7 @@ namespace BarGraph.EditorDemo
             return l;
         }
 
-        private static Button TbButton(string text, System.Action action)
+        private static Button TbButton(string text, Action action)
         {
             var b = new Button(action) { text = text };
             b.style.marginLeft   = 2;

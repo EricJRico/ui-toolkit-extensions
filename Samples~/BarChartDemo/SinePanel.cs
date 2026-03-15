@@ -8,7 +8,7 @@ namespace BarGraph.Demo
     /// <summary>
     /// Displays a composite sine wave as a bar graph.
     /// </summary>
-    sealed class SinePanel : DemoPanel
+    public sealed class SinePanel : DemoPanel
     {
         private int   _barCount  = 120;
         private float _frequency = 6f;
@@ -39,6 +39,7 @@ namespace BarGraph.Demo
             AddControl(MakeButton("Regenerate", Regenerate));
             AddSortToggle();
             AddOverlayToggle();
+            AddZoomYToggle();
             AddResetViewButton();
 
             Regenerate();

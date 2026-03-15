@@ -8,7 +8,7 @@ namespace BarGraph.Demo
     /// <summary>
     /// Displays a random-walk dataset as a bar graph.
     /// </summary>
-    sealed class RandomPanel : DemoPanel
+    public sealed class RandomPanel : DemoPanel
     {
         private int _barCount = 80;
 
@@ -25,6 +25,7 @@ namespace BarGraph.Demo
             AddControl(MakeButton("Regenerate", Regenerate));
             AddSortToggle();
             AddOverlayToggle();
+            AddZoomYToggle();
             AddResetViewButton();
 
             Regenerate();

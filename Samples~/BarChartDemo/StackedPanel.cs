@@ -9,7 +9,7 @@ namespace BarGraph.Demo
     /// Displays stacked bars with configurable segment count and HSL hue-rotation
     /// colour support for large palettes (up to 1000 segments).
     /// </summary>
-    sealed class StackedPanel : DemoPanel
+    public sealed class StackedPanel : DemoPanel
     {
         private int  _barCount     = 40;
         private int  _segmentCount = 4;
@@ -62,6 +62,7 @@ namespace BarGraph.Demo
             AddControl(MakeButton("Regenerate", Regenerate));
             AddSortToggle();
             AddOverlayToggle();
+            AddZoomYToggle();
             AddResetViewButton();
 
             Regenerate();

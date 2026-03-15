@@ -9,7 +9,7 @@ namespace BarGraph.Demo
     /// Streams bars into the graph in real time using <see cref="BarGraphElement.AppendBar"/>.
     /// Automatically wraps around after <see cref="_maxBars"/> entries.
     /// </summary>
-    sealed class LiveFeedPanel : DemoPanel
+    public sealed class LiveFeedPanel : DemoPanel
     {
         private bool  _playing       = false;
         private float _barsPerSecond = 50f;
@@ -45,6 +45,7 @@ namespace BarGraph.Demo
                 _accumulator = 0f;
             }));
 
+            AddZoomYToggle();
             AddResetViewButton();
 
             Regenerate();

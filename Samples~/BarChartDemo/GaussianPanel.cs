@@ -8,7 +8,7 @@ namespace BarGraph.Demo
     /// <summary>
     /// Displays a Gaussian (normal) distribution histogram generated via Box-Muller.
     /// </summary>
-    sealed class GaussianPanel : DemoPanel
+    public sealed class GaussianPanel : DemoPanel
     {
         private int _binCount         = 80;
         private int _sampleMultiplier = 80;
@@ -31,6 +31,7 @@ namespace BarGraph.Demo
 
             AddControl(MakeButton("Regenerate", Regenerate));
             AddSortToggle();
+            AddZoomYToggle();
             AddResetViewButton();
 
             Regenerate();

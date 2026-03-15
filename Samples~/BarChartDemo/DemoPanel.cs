@@ -11,7 +11,7 @@ namespace BarGraph.Demo
     /// Abstract base for every gallery panel.
     /// Provides the card chrome, graph setup, and common controls.
     /// </summary>
-    abstract class DemoPanel
+    public abstract class DemoPanel
     {
         // ── Public accessors ────────────────────────────────────────────────
         public VisualElement   Card  { get; }
@@ -264,6 +264,17 @@ namespace BarGraph.Demo
 
         /// <summary>Override to supply overlay data when the toggle is turned on.</summary>
         protected virtual void ApplyOverlay() { }
+
+        protected void AddZoomYToggle()
+        {
+            AddControl(MakeToggleButton("ZoomY Off", "ZoomY", false, on =>
+            {
+                var s = Graph.Settings;
+                s.EnableMouseZoomY = on;
+                s.EnableYPan       = on;
+                Graph.UpdateSettings(s);
+            }));
+        }
 
         protected void AddResetViewButton()
         {

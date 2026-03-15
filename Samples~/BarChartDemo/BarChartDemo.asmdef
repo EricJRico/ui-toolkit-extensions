@@ -1,13 +1,10 @@
 {
-    "name": "BarChartEditorWindowDemo",
-    "rootNamespace": "BarGraph.EditorDemo",
+    "name": "BarChartDemo",
+    "rootNamespace": "BarGraph.Demo",
     "references": [
-        "GUID:aa3977563a43eca4c9090c940ed49a07",
-        "BarChartDemo"
+        "GUID:aa3977563a43eca4c9090c940ed49a07"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
