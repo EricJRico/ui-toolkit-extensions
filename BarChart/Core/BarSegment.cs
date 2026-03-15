@@ -14,7 +14,7 @@ namespace BarGraph.Core
         public readonly float Value;
 
         /// <summary>
-        /// Fill colour.  default(Color32) defers to <see cref="BarGraphSettings.DefaultBarColor"/>.
+        /// Fill colour.  default(Color32) defers to the <c>--bar-graph-default-bar-color</c> USS custom property.
         /// </summary>
         public readonly Color32 Color;
 

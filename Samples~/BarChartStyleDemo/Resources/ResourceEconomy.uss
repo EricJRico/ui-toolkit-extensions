@@ -1,0 +1,27 @@
+/* ResourceEconomy.uss — Rich, warm/gold theme
+   Generous spacing, large labels.  */
+
+.bar-graph--resource-economy {
+    /* ── Chrome colours ──────────────────────────────────────────────── */
+    --bar-graph-bg-color:                rgb(18, 15, 8);
+    --bar-graph-axis-color:              rgb(115, 89, 51);
+    --bar-graph-grid-line-color:         rgb(38, 31, 15);
+    --bar-graph-hover-tint-color:        rgba(255, 255, 255, 0.12);
+    --bar-graph-selection-fill-color:    rgba(255, 214, 0, 0.15);
+    --bar-graph-selection-rim-color:     rgba(255, 214, 0, 0.9);
+    --bar-graph-drag-rect-fill-color:    rgba(204, 179, 51, 0.08);
+    --bar-graph-drag-rect-border-color:  rgba(204, 179, 51, 0.6);
+
+    /* ── Chrome geometry ─────────────────────────────────────────────── */
+    --bar-graph-grid-line-width:         2;
+    --bar-graph-bar-spacing-ratio:       0.18;
+    --bar-graph-padding-bottom:          20;
+    --bar-graph-x-label-width:           30;
+}
+
+/* ── Label typography ────────────────────────────────────────────────── */
+.bar-graph--resource-economy .bar-graph__label--y,
+.bar-graph--resource-economy .bar-graph__label--x {
+    color: rgb(230, 217, 179);
+    font-size: 13px;
+}

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 using BarGraph.Core;
 
 namespace BarGraph.StyleDemo
@@ -20,27 +21,12 @@ namespace BarGraph.StyleDemo
 
         private static PanelTheme BuildTheme() => new PanelTheme
         {
-            CardBackground = new Color(0.09f, 0.07f, 0.04f),
-            CardBorder     = new Color(0.25f, 0.18f, 0.08f),
-            TitleColor     = new Color(0.95f, 0.85f, 0.5f),
-            GraphSettings  = new BarGraphSettings
-            {
-                BackgroundColor    = new Color(0.07f, 0.06f, 0.03f),
-                DefaultBarColor    = GoldColor,
-                AxisColor          = new Color(0.45f, 0.35f, 0.2f),
-                GridLineColor      = new Color(0.15f, 0.12f, 0.06f),
-                LabelColor         = new Color(0.9f, 0.85f, 0.7f),
-                HoverTintColor     = new Color(1f, 1f, 1f, 0.12f),
-                SelectionFillColor = new Color(1f, 0.84f, 0f, 0.15f),
-                SelectionRimColor  = new Color(1f, 0.84f, 0f, 0.9f),
-                DragRectFillColor  = new Color(0.8f, 0.7f, 0.2f, 0.08f),
-                DragRectBorderColor = new Color(0.8f, 0.7f, 0.2f, 0.6f),
-                ShowGrid           = true,
-                GridLineCount      = 5,
-                PaddingBottom      = 20,
-                XLabelWidth        = 30,
-                BarSpacingRatio    = 0.18f
-            }
+            CardBackground   = new Color(0.09f, 0.07f, 0.04f),
+            CardBorder       = new Color(0.25f, 0.18f, 0.08f),
+            TitleColor       = new Color(0.95f, 0.85f, 0.5f),
+            ThemeClassName   = "bar-graph--resource-economy",
+            ThemeStyleSheet  = Resources.Load<StyleSheet>("ResourceEconomy"),
+            BehaviorSettings = null
         };
 
         public ResourceEconomyPanel() : base("Resource Economy", BuildTheme()) { }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UIElements;
 using BarGraph.Core;
 
 namespace BarGraph.AnimationDemo
@@ -57,22 +58,15 @@ namespace BarGraph.AnimationDemo
 
         public SortingVisualizerPanel() : base("Algorithm Theater", new AnimationPanelTheme
         {
-            CardBackground = new Color(0.03f, 0.06f, 0.03f),
-            CardBorder     = new Color(0.1f,  0.25f, 0.1f),
-            TitleColor     = new Color(0.4f,  0.95f, 0.4f),
-            GraphSettings  = new BarGraphSettings
+            CardBackground  = new Color(0.03f, 0.06f, 0.03f),
+            CardBorder      = new Color(0.1f,  0.25f, 0.1f),
+            TitleColor      = new Color(0.4f,  0.95f, 0.4f),
+            ThemeClassName  = "sorting-visualizer-theme",
+            ThemeStyleSheet = Resources.Load<StyleSheet>("SortingVisualizerTheme"),
+            BehaviorSettings = new BarGraphSettings
             {
-                BackgroundColor   = new Color(0.02f, 0.04f, 0.02f),
-                AxisColor         = new Color(0.15f, 0.3f,  0.15f),
-                GridLineColor     = new Color(0.06f, 0.14f, 0.06f),
-                LabelColor        = new Color(0.5f,  0.9f,  0.5f),
-                SelectionRimColor = new Color(0.3f,  1f,    0.3f, 0.9f),
-                FocusRimColor     = new Color(0.5f,  1f,    0.5f, 1f),
-                BarSpacingRatio   = 0.05f,
-                PaddingBottom     = 12,
-                PaddingLeft       = 36,
-                ShowGrid          = true,
-                GridLineCount     = 4,
+                ShowGrid      = true,
+                GridLineCount = 4,
             }
         })
         { }

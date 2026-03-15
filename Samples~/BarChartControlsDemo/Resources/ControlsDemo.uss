@@ -1,0 +1,6 @@
+/* ControlsDemo.uss — Shared visual theme for all controls cheat-sheet panels.
+   Compact bar spacing to fit many bars in small panel graphs.  */
+
+.bar-graph--controls-demo {
+    --bar-graph-bar-spacing-ratio: 0.12;
+}

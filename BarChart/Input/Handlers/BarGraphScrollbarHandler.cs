@@ -118,22 +118,20 @@ namespace BarGraph.Input.Handlers
 
         private void ApplyLayout()
         {
-            var s = _element.Settings;
-
             // Centre the scrollbar in the space below X labels
-            float belowLabelsX = s.PaddingBottom - s.XLabelOffsetY - s.LabelHeight;
+            float belowLabelsX = _element.VisPaddingBottom - _element.VisXLabelOffsetY - _element.VisLabelHeight;
             float insetBottom  = Mathf.Max(0f, (belowLabelsX - BarThickness) * 0.5f);
 
-            _trackX.style.left   = s.PaddingLeft;
-            _trackX.style.right  = s.PaddingRight;
+            _trackX.style.left   = _element.VisPaddingLeft;
+            _trackX.style.right  = _element.VisPaddingRight;
             _trackX.style.bottom = insetBottom;
             _trackX.style.height = BarThickness;
 
             // Centre the scrollbar in the right padding area
-            float insetRight = Mathf.Max(0f, (s.PaddingRight - BarThickness) * 0.5f);
+            float insetRight = Mathf.Max(0f, (_element.VisPaddingRight - BarThickness) * 0.5f);
 
-            _trackY.style.top    = s.PaddingTop;
-            _trackY.style.bottom = s.PaddingBottom;
+            _trackY.style.top    = _element.VisPaddingTop;
+            _trackY.style.bottom = _element.VisPaddingBottom;
             _trackY.style.right  = insetRight;
             _trackY.style.width  = BarThickness;
         }

@@ -38,6 +38,104 @@ namespace BarGraph.Core
     public sealed partial class BarGraphElement : VisualElement
     {
         // ─────────────────────────────────────────────────────────────────────
+        //  USS custom style properties  (Painter2D chrome → read at style-resolve time)
+        // ─────────────────────────────────────────────────────────────────────
+
+        // Colors
+        static readonly CustomStyleProperty<Color> k_BgColor              = new("--bar-graph-bg-color");
+        static readonly CustomStyleProperty<Color> k_DefaultBarColor      = new("--bar-graph-default-bar-color");
+        static readonly CustomStyleProperty<Color> k_AxisColor            = new("--bar-graph-axis-color");
+        static readonly CustomStyleProperty<Color> k_GridLineColor        = new("--bar-graph-grid-line-color");
+        static readonly CustomStyleProperty<Color> k_HoverTintColor       = new("--bar-graph-hover-tint-color");
+        static readonly CustomStyleProperty<Color> k_SelectionFillColor   = new("--bar-graph-selection-fill-color");
+        static readonly CustomStyleProperty<Color> k_SelectionRimColor    = new("--bar-graph-selection-rim-color");
+        static readonly CustomStyleProperty<Color> k_DragRectFillColor    = new("--bar-graph-drag-rect-fill-color");
+        static readonly CustomStyleProperty<Color> k_DragRectBorderColor  = new("--bar-graph-drag-rect-border-color");
+        static readonly CustomStyleProperty<Color> k_FocusRimColor        = new("--bar-graph-focus-rim-color");
+        static readonly CustomStyleProperty<Color> k_OverlayTint          = new("--bar-graph-overlay-tint");
+
+        // Floats
+        static readonly CustomStyleProperty<float> k_SelectionRimWidth    = new("--bar-graph-selection-rim-width");
+        static readonly CustomStyleProperty<float> k_OverlayOpacity       = new("--bar-graph-overlay-opacity");
+        static readonly CustomStyleProperty<float> k_BarSpacingRatio      = new("--bar-graph-bar-spacing-ratio");
+        static readonly CustomStyleProperty<float> k_MinBarWidth          = new("--bar-graph-min-bar-width");
+        static readonly CustomStyleProperty<float> k_GridLineWidth        = new("--bar-graph-grid-line-width");
+        static readonly CustomStyleProperty<float> k_AxisLineWidth        = new("--bar-graph-axis-line-width");
+        static readonly CustomStyleProperty<float> k_PaddingLeft          = new("--bar-graph-padding-left");
+        static readonly CustomStyleProperty<float> k_PaddingRight         = new("--bar-graph-padding-right");
+        static readonly CustomStyleProperty<float> k_PaddingTop           = new("--bar-graph-padding-top");
+        static readonly CustomStyleProperty<float> k_PaddingBottom        = new("--bar-graph-padding-bottom");
+        static readonly CustomStyleProperty<float> k_LabelHeight          = new("--bar-graph-label-height");
+        static readonly CustomStyleProperty<float> k_XLabelWidth          = new("--bar-graph-x-label-width");
+        static readonly CustomStyleProperty<float> k_XLabelOffsetY        = new("--bar-graph-x-label-offset-y");
+        static readonly CustomStyleProperty<float> k_YLabelGap            = new("--bar-graph-y-label-gap");
+
+        // ─────────────────────────────────────────────────────────────────────
+        //  Resolved visual cache  (populated from USS, read by draw methods)
+        // ─────────────────────────────────────────────────────────────────────
+
+        private struct ResolvedVisuals
+        {
+            public Color BackgroundColor;
+            public Color DefaultBarColor;
+            public Color AxisColor;
+            public Color GridLineColor;
+            public Color HoverTintColor;
+            public Color SelectionFillColor;
+            public Color SelectionRimColor;
+            public Color DragRectFillColor;
+            public Color DragRectBorderColor;
+            public Color FocusRimColor;
+            public Color OverlayTint;
+
+            public float SelectionRimWidth;
+            public float OverlayOpacity;
+            public float BarSpacingRatio;
+            public float MinBarWidthPx;
+            public float GridLineWidth;
+            public float AxisLineWidth;
+            public float PaddingLeft, PaddingRight, PaddingTop, PaddingBottom;
+            public float LabelHeight;
+            public float XLabelWidth, XLabelOffsetY;
+            public float YLabelGap;
+        }
+
+        private ResolvedVisuals _vis = new ResolvedVisuals
+        {
+            // Defaults match original BarGraphSettings so the graph looks identical
+            // before any USS is resolved.
+            BackgroundColor    = new Color(0.07f, 0.07f, 0.10f, 1.00f),
+            DefaultBarColor    = new Color(0.25f, 0.60f, 1.00f, 1.00f),
+            AxisColor          = new Color(0.55f, 0.55f, 0.60f, 1.00f),
+            GridLineColor      = new Color(0.18f, 0.18f, 0.24f, 1.00f),
+            HoverTintColor     = new Color(1.00f, 1.00f, 1.00f, 0.18f),
+            SelectionFillColor = new Color(1.00f, 1.00f, 1.00f, 0.22f),
+            SelectionRimColor  = new Color(0.40f, 0.70f, 1.00f, 0.90f),
+            DragRectFillColor  = new Color(0.35f, 0.65f, 1.00f, 0.08f),
+            DragRectBorderColor= new Color(0.35f, 0.65f, 1.00f, 0.60f),
+            FocusRimColor      = new Color(1.00f, 0.80f, 0.20f, 1.00f),
+            OverlayTint        = new Color(1.00f, 1.00f, 1.00f, 0.38f),
+
+            SelectionRimWidth  = 1.5f,
+            OverlayOpacity     = 0.35f,
+            BarSpacingRatio    = 0.12f,
+            MinBarWidthPx      = 1f,
+            GridLineWidth      = 1f,
+            AxisLineWidth      = 1.5f,
+            PaddingLeft        = 52f,
+            PaddingRight       = 12f,
+            PaddingTop         = 12f,
+            PaddingBottom      = 32f,
+            LabelHeight        = 18f,
+            XLabelWidth        = 40f,
+            XLabelOffsetY      = 3f,
+            YLabelGap          = 4f,
+        };
+
+        // Default USS — loaded once, shared by all instances.
+        private static StyleSheet s_defaultSheet;
+
+        // ─────────────────────────────────────────────────────────────────────
         //  Core state
         // ─────────────────────────────────────────────────────────────────────
 
@@ -136,7 +234,17 @@ namespace BarGraph.Core
             focusable      = true;
             tabIndex       = 0;
 
+            // USS class names — connect selectors in BarGraph.uss
+            AddToClassList("bar-graph");
+
+            // Load default stylesheet (cached across all instances)
+            if (s_defaultSheet == null)
+                s_defaultSheet = Resources.Load<StyleSheet>("BarGraph");
+            if (s_defaultSheet != null)
+                styleSheets.Add(s_defaultSheet);
+
             _labelRoot = new VisualElement { name = "bar-graph__labels", pickingMode = PickingMode.Ignore };
+            _labelRoot.AddToClassList("bar-graph__labels");
             _labelRoot.style.position = Position.Absolute;
             _labelRoot.style.left     = 0;
             _labelRoot.style.top      = 0;
@@ -149,9 +257,49 @@ namespace BarGraph.Core
             RegisterCallback<GeometryChangedEvent>(_ => { EnsureLabelPool(); MarkDirtyRepaint(); });
             RegisterCallback<AttachToPanelEvent>(_ =>
                 schedule.Execute(FlushLabelPositions).Every(0));
+            RegisterCallback<CustomStyleResolvedEvent>(_ => ResolveCustomStyles());
 
             RegisterCallback<KeyDownEvent>(OnKeyDown);
             _model.DataChanged += OnDataChanged;
+        }
+
+        /// <summary>
+        /// Reads USS custom properties into the <see cref="_vis"/> cache.
+        /// Called once on attach and again whenever USS classes or stylesheets change.
+        /// </summary>
+        private void ResolveCustomStyles()
+        {
+            var cs = customStyle;
+
+            if (cs.TryGetValue(k_BgColor,             out var c)) _vis.BackgroundColor     = c;
+            if (cs.TryGetValue(k_DefaultBarColor,      out c))    _vis.DefaultBarColor      = c;
+            if (cs.TryGetValue(k_AxisColor,            out c))    _vis.AxisColor             = c;
+            if (cs.TryGetValue(k_GridLineColor,        out c))    _vis.GridLineColor         = c;
+            if (cs.TryGetValue(k_HoverTintColor,       out c))    _vis.HoverTintColor        = c;
+            if (cs.TryGetValue(k_SelectionFillColor,   out c))    _vis.SelectionFillColor    = c;
+            if (cs.TryGetValue(k_SelectionRimColor,    out c))    _vis.SelectionRimColor     = c;
+            if (cs.TryGetValue(k_DragRectFillColor,    out c))    _vis.DragRectFillColor     = c;
+            if (cs.TryGetValue(k_DragRectBorderColor,  out c))    _vis.DragRectBorderColor   = c;
+            if (cs.TryGetValue(k_FocusRimColor,        out c))    _vis.FocusRimColor         = c;
+            if (cs.TryGetValue(k_OverlayTint,          out c))    _vis.OverlayTint           = c;
+
+            if (cs.TryGetValue(k_SelectionRimWidth,    out var f)) _vis.SelectionRimWidth    = f;
+            if (cs.TryGetValue(k_OverlayOpacity,       out f))    _vis.OverlayOpacity        = f;
+            if (cs.TryGetValue(k_BarSpacingRatio,      out f))    _vis.BarSpacingRatio       = f;
+            if (cs.TryGetValue(k_MinBarWidth,          out f))    _vis.MinBarWidthPx         = f;
+            if (cs.TryGetValue(k_GridLineWidth,        out f))    _vis.GridLineWidth         = f;
+            if (cs.TryGetValue(k_AxisLineWidth,        out f))    _vis.AxisLineWidth         = f;
+            if (cs.TryGetValue(k_PaddingLeft,          out f))    _vis.PaddingLeft           = f;
+            if (cs.TryGetValue(k_PaddingRight,         out f))    _vis.PaddingRight          = f;
+            if (cs.TryGetValue(k_PaddingTop,           out f))    _vis.PaddingTop            = f;
+            if (cs.TryGetValue(k_PaddingBottom,        out f))    _vis.PaddingBottom         = f;
+            if (cs.TryGetValue(k_LabelHeight,          out f))    _vis.LabelHeight           = f;
+            if (cs.TryGetValue(k_XLabelWidth,          out f))    _vis.XLabelWidth           = f;
+            if (cs.TryGetValue(k_XLabelOffsetY,        out f))    _vis.XLabelOffsetY         = f;
+            if (cs.TryGetValue(k_YLabelGap,            out f))    _vis.YLabelGap             = f;
+
+            RebuildLabelPool();
+            MarkDirtyRepaint();
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -226,8 +374,16 @@ namespace BarGraph.Core
         /// <summary>Read-only access to the live view state (for external inspection).</summary>
         public ChartViewState ViewState => _viewState;
 
-        /// <summary>Current settings. Use <see cref="UpdateSettings"/> to apply changes.</summary>
+        /// <summary>Current behavioural settings. Use <see cref="UpdateSettings"/> to apply changes.</summary>
         public BarGraphSettings Settings => _settings;
+
+        // ── Resolved visual accessors (for handlers that need layout values) ──
+        internal float VisPaddingLeft   => _vis.PaddingLeft;
+        internal float VisPaddingRight  => _vis.PaddingRight;
+        internal float VisPaddingTop    => _vis.PaddingTop;
+        internal float VisPaddingBottom => _vis.PaddingBottom;
+        internal float VisLabelHeight   => _vis.LabelHeight;
+        internal float VisXLabelOffsetY => _vis.XLabelOffsetY;
 
         /// <summary>
         /// Pluggable Y-axis label formatter.
@@ -286,7 +442,7 @@ namespace BarGraph.Core
         /// <summary>Set the secondary comparison overlay dataset (flat floats).</summary>
         public void SetOverlay(IList<float> values, Color? overlayColor = null)
         {
-            Color32 c = overlayColor.HasValue ? (Color32)overlayColor.Value : (Color32)_settings.OverlayTint;
+            Color32 c = overlayColor.HasValue ? (Color32)overlayColor.Value : (Color32)_vis.OverlayTint;
             _model.SetOverlay(values, c);
         }
 
@@ -307,7 +463,7 @@ namespace BarGraph.Core
         //  Public API – settings / sort / view
         // ─────────────────────────────────────────────────────────────────────
 
-        /// <summary>Apply new visual / behaviour settings without touching data.</summary>
+        /// <summary>Apply new behavioural settings without touching data.</summary>
         public void UpdateSettings(BarGraphSettings s)
         {
             _settings = s ?? throw new ArgumentNullException(nameof(s));
@@ -432,10 +588,10 @@ namespace BarGraph.Core
         }
 
         internal float GetPlotWidth()  =>
-            Mathf.Max(1f, contentRect.width  - _settings.PaddingLeft - _settings.PaddingRight);
+            Mathf.Max(1f, contentRect.width  - _vis.PaddingLeft - _vis.PaddingRight);
 
         internal float GetPlotHeight() =>
-            Mathf.Max(1f, contentRect.height - _settings.PaddingTop  - _settings.PaddingBottom);
+            Mathf.Max(1f, contentRect.height - _vis.PaddingTop  - _vis.PaddingBottom);
 
         // ─────────────────────────────────────────────────────────────────────
         //  Internal state mutators (called by manipulators; each dirty-repaints)
@@ -616,15 +772,15 @@ namespace BarGraph.Core
         {
             if (_model.BarCount == 0) return -1;
 
-            float plotX  = _settings.PaddingLeft;
-            float plotY2 = contentRect.height - _settings.PaddingBottom;
+            float plotX  = _vis.PaddingLeft;
+            float plotY2 = contentRect.height - _vis.PaddingBottom;
 
             // Must be inside the plot area
             if (localPos.x < plotX || localPos.y > plotY2) return -1;
 
             float stride  = GetBarStride();   // pixels per slot at current zoom
-            float gapPx   = stride * _settings.BarSpacingRatio;
-            float barW    = Mathf.Max(_settings.MinBarWidthPx, stride - gapPx);
+            float gapPx   = stride * _vis.BarSpacingRatio;
+            float barW    = Mathf.Max(_vis.MinBarWidthPx, stride - gapPx);
 
             float relX    = localPos.x - plotX + _viewState.PanX * stride;
             if (relX < 0f) return -1;
@@ -668,7 +824,7 @@ namespace BarGraph.Core
             float stride = GetBarStride();
             if (stride < 1f) return SegmentHitResult.Miss;
 
-            float plotY2 = contentRect.height - _settings.PaddingBottom;
+            float plotY2 = contentRect.height - _vis.PaddingBottom;
             float plotH  = GetPlotHeight();
             float yScale = plotH / _effectiveMaxY * _viewState.ZoomY;
             float yOffset = _viewState.PanY * plotH;
@@ -835,15 +991,15 @@ namespace BarGraph.Core
             Painter2D p = mgc.painter2D;
 
             // 1 – Background
-            FillRect(p, _settings.BackgroundColor, 0, 0, cr.width, cr.height);
+            FillRect(p, _vis.BackgroundColor, 0, 0, cr.width, cr.height);
 
             // 2 – Plot-area bounds
-            float pL    = _settings.PaddingLeft;
-            float pT    = _settings.PaddingTop;
+            float pL    = _vis.PaddingLeft;
+            float pT    = _vis.PaddingTop;
             float plotX  = pL;
             float plotY  = pT;
-            float plotW  = cr.width  - pL - _settings.PaddingRight;
-            float plotH  = cr.height - pT - _settings.PaddingBottom;
+            float plotW  = cr.width  - pL - _vis.PaddingRight;
+            float plotH  = cr.height - pT - _vis.PaddingBottom;
             float plotX2 = plotX + plotW;
             float plotY2 = plotY + plotH;   // bottom edge (Y increases downward)
 
@@ -898,10 +1054,10 @@ namespace BarGraph.Core
                 {
                     if (stride >= 1f)
                         DrawDirectBars(startDisp, endDisp, plotX, plotY2, stride, barW,
-                                       plotH, _model, true, _settings.OverlayOpacity);
+                                       plotH, _model, true, _vis.OverlayOpacity);
                     else
                         DrawLodBars(startDisp, endDisp, plotX, plotY2, plotW, plotH,
-                                    _model, _settings.OverlayOpacity);
+                                    _model, _vis.OverlayOpacity);
                 }
             }
 
@@ -923,10 +1079,10 @@ namespace BarGraph.Core
             //      plotY so its lower half sits inside the plot area.  Overpainting
             //      the strips creates a clean frame that masks any bar tip that
             //      touches a boundary and keeps label backgrounds opaque.
-            FillRect(p, _settings.BackgroundColor, 0,      0,      cr.width,           pT);
-            FillRect(p, _settings.BackgroundColor, 0,      plotY2, cr.width,           cr.height - plotY2);
-            FillRect(p, _settings.BackgroundColor, 0,      pT,     pL,                 plotH);
-            FillRect(p, _settings.BackgroundColor, plotX2, pT,     cr.width - plotX2,  plotH);
+            FillRect(p, _vis.BackgroundColor, 0,      0,      cr.width,           pT);
+            FillRect(p, _vis.BackgroundColor, 0,      plotY2, cr.width,           cr.height - plotY2);
+            FillRect(p, _vis.BackgroundColor, 0,      pT,     pL,                 plotH);
+            FillRect(p, _vis.BackgroundColor, plotX2, pT,     cr.width - plotX2,  plotH);
 
             // 8 – Axes (on top of bars and overdraw)
             if (_settings.ShowAxes)
@@ -948,8 +1104,8 @@ namespace BarGraph.Core
         private void DrawGrid(Painter2D p,
             float plotX, float plotX2, float plotY, float plotY2, float plotH)
         {
-            p.strokeColor = _settings.GridLineColor;
-            p.lineWidth   = 1f;
+            p.strokeColor = _vis.GridLineColor;
+            p.lineWidth   = _vis.GridLineWidth;
             int lines = _settings.GridLineCount;
             for (int i = 0; i <= lines; i++)
             {
@@ -1191,7 +1347,7 @@ namespace BarGraph.Core
                     int pixelCount = Mathf.Max(1, Mathf.FloorToInt(plotW));
                     int viewCount  = endDisp - startDisp;
 
-                    p.fillColor = _settings.SelectionFillColor;
+                    p.fillColor = _vis.SelectionFillColor;
                     p.BeginPath();
                     for (int px = 0; px < pixelCount; px++)
                     {
@@ -1220,7 +1376,7 @@ namespace BarGraph.Core
                     // Fill pass — per-bar rects so highlight only covers bars,
                     // not the gaps between them.  Single path + OddEven is
                     // already correct (no alpha accumulation).
-                    p.fillColor = _settings.SelectionFillColor;
+                    p.fillColor = _vis.SelectionFillColor;
                     p.BeginPath();
                     for (int dispIdx = startDisp; dispIdx < endDisp; dispIdx++)
                     {
@@ -1258,8 +1414,8 @@ namespace BarGraph.Core
                         _selectionRuns.Add(endDisp);
                     }
 
-                    p.strokeColor = _settings.SelectionRimColor;
-                    p.lineWidth   = _settings.SelectionRimWidth;
+                    p.strokeColor = _vis.SelectionRimColor;
+                    p.lineWidth   = _vis.SelectionRimWidth;
                     float selInset = p.lineWidth * 0.5f + 0.5f;
                     for (int i = 0; i < _selectionRuns.Count; i += 2)
                     {
@@ -1283,7 +1439,7 @@ namespace BarGraph.Core
                     ? _viewState.DataToDisplay[focIdx] : focIdx;
                 SnapBarX(displayIdx, plotX, stride, barW, out float fx, out float fw);
 
-                p.strokeColor = _settings.FocusRimColor;
+                p.strokeColor = _vis.FocusRimColor;
                 p.lineWidth   = 2f;
                 float focInset = p.lineWidth * 0.5f + 0.5f;
                 p.BeginPath();
@@ -1302,7 +1458,7 @@ namespace BarGraph.Core
                 // In LOD mode use a 1 px wide tint; in normal mode use the full barW.
                 if (lodMode) hw = 1f;
 
-                p.fillColor = _settings.HoverTintColor;
+                p.fillColor = _vis.HoverTintColor;
                 p.BeginPath();
                 PathRect(p, hx, plotY2 - plotH, hw, plotH);
                 p.Fill();
@@ -1339,14 +1495,14 @@ namespace BarGraph.Core
                             if (drawH >= 0.5f)
                             {
                                 // Tint fill
-                                p.fillColor = _settings.HoverTintColor;
+                                p.fillColor = _vis.HoverTintColor;
                                 p.BeginPath();
                                 PathRect(p, sx, drawTop, sw, drawH);
                                 p.Fill();
 
                                 // Outline
-                                p.strokeColor = _settings.SelectionRimColor;
-                                p.lineWidth   = _settings.SelectionRimWidth;
+                                p.strokeColor = _vis.SelectionRimColor;
+                                p.lineWidth   = _vis.SelectionRimWidth;
                                 p.BeginPath();
                                 PathRect(p, sx, drawTop, sw, drawH);
                                 p.Stroke();
@@ -1365,12 +1521,12 @@ namespace BarGraph.Core
 
         private void DrawDragRect(Painter2D p, Rect r)
         {
-            p.fillColor = _settings.DragRectFillColor;
+            p.fillColor = _vis.DragRectFillColor;
             p.BeginPath();
             PathRect(p, r.x, r.y, r.width, r.height);
             p.Fill();
 
-            p.strokeColor = _settings.DragRectBorderColor;
+            p.strokeColor = _vis.DragRectBorderColor;
             p.lineWidth   = 1f;
             p.BeginPath();
             PathRect(p, r.x, r.y, r.width, r.height);
@@ -1384,8 +1540,8 @@ namespace BarGraph.Core
         private void DrawAxes(Painter2D p,
             float plotX, float plotX2, float plotY, float plotY2)
         {
-            p.strokeColor = _settings.AxisColor;
-            p.lineWidth   = 1.5f;
+            p.strokeColor = _vis.AxisColor;
+            p.lineWidth   = _vis.AxisLineWidth;
             p.BeginPath();
             p.MoveTo(new Vector2(plotX, plotY));
             p.LineTo(new Vector2(plotX, plotY2));
@@ -1416,8 +1572,8 @@ namespace BarGraph.Core
             _xLabels.Clear();
 
             int yCount = Mathf.Min(_settings.MaxYLabels + 1, _settings.GridLineCount + 1);
-            for (int i = 0; i < yCount; i++) { var l = MakeLabel(); _yLabels.Add(l); _labelRoot.Add(l); }
-            for (int i = 0; i < _settings.MaxXLabels; i++) { var l = MakeLabel(); _xLabels.Add(l); _labelRoot.Add(l); }
+            for (int i = 0; i < yCount; i++) { var l = MakeLabel("bar-graph__label--y"); _yLabels.Add(l); _labelRoot.Add(l); }
+            for (int i = 0; i < _settings.MaxXLabels; i++) { var l = MakeLabel("bar-graph__label--x"); _xLabels.Add(l); _labelRoot.Add(l); }
         }
 
         /// <summary>
@@ -1455,8 +1611,8 @@ namespace BarGraph.Core
                 float y    = plotY2 - t * plotH;
                 lbl.text   = _yFormatter(val);
                 lbl.style.left   = 0f;
-                lbl.style.top    = y - _settings.LabelHeight * 0.5f;
-                lbl.style.width  = plotX - _settings.YLabelGap;
+                lbl.style.top    = y - _vis.LabelHeight * 0.5f;
+                lbl.style.width  = plotX - _vis.YLabelGap;
                 lbl.style.unityTextAlign = new StyleEnum<TextAnchor>(TextAnchor.MiddleRight);
                 lbl.visible = true;
             }
@@ -1464,8 +1620,8 @@ namespace BarGraph.Core
             // X-axis bar labels — show as many as fit without overlapping
             CalcViewSlice(plotW, out float stride, out float barW, out int startDisp, out int endDisp);
             int viewCnt    = endDisp - startDisp;
-            int showCount  = _settings.XLabelWidth > 0
-                ? Mathf.Min(_xLabels.Count, Mathf.FloorToInt(plotW / _settings.XLabelWidth))
+            int showCount  = _vis.XLabelWidth > 0
+                ? Mathf.Min(_xLabels.Count, Mathf.FloorToInt(plotW / _vis.XLabelWidth))
                 : 0;
             bool show = showCount > 0 && viewCnt > 0;
 
@@ -1491,9 +1647,9 @@ namespace BarGraph.Core
                 SnapBarX(dispIdx, plotX, stride, barW, out float sx, out float sw);
                 float x = sx + sw * 0.5f;
                 lbl.text = text;
-                lbl.style.left   = x - _settings.XLabelWidth * 0.5f;
-                lbl.style.top    = plotY2 + _settings.XLabelOffsetY;
-                lbl.style.width  = _settings.XLabelWidth;
+                lbl.style.left   = x - _vis.XLabelWidth * 0.5f;
+                lbl.style.top    = plotY2 + _vis.XLabelOffsetY;
+                lbl.style.width  = _vis.XLabelWidth;
                 lbl.style.unityTextAlign = new StyleEnum<TextAnchor>(TextAnchor.UpperCenter);
                 lbl.visible = (x >= plotX && x <= plotX + plotW);
             }
@@ -1552,8 +1708,8 @@ namespace BarGraph.Core
             // stride = plotW / total at zoom=1, scaled by ZoomX
             float baseStride = plotW / total;
             stride = baseStride * _viewState.ZoomX;
-            float gap = stride * _settings.BarSpacingRatio;
-            barW = Mathf.Max(_settings.MinBarWidthPx, stride - gap);
+            float gap = stride * _vis.BarSpacingRatio;
+            barW = Mathf.Max(_vis.MinBarWidthPx, stride - gap);
 
             // PanX is in data-space (fractional bar units)
             // How many bars fit in the viewport?
@@ -1619,8 +1775,8 @@ namespace BarGraph.Core
         {
             if (_model.BarCount == 0) return;
 
-            float plotX  = _settings.PaddingLeft;
-            float plotY2 = contentRect.height - _settings.PaddingBottom;
+            float plotX  = _vis.PaddingLeft;
+            float plotY2 = contentRect.height - _vis.PaddingBottom;
             float plotH  = GetPlotHeight();
             float plotW  = GetPlotWidth();
 
@@ -1850,20 +2006,22 @@ namespace BarGraph.Core
         //  Label helpers
         // ─────────────────────────────────────────────────────────────────────
 
-        private Label MakeLabel() => new Label
+        private Label MakeLabel(string ussClass)
         {
-            pickingMode = PickingMode.Ignore,
-            style =
+            var l = new Label
             {
-                position    = Position.Absolute,
-                fontSize    = _settings.LabelFontSize,
-                color       = _settings.LabelColor,
-                overflow    = Overflow.Hidden,
-                height      = _settings.LabelHeight,
-                paddingLeft  = 0, paddingRight  = 0,
-                marginLeft   = 0, marginRight   = 0,
-            }
-        };
+                pickingMode = PickingMode.Ignore,
+                style =
+                {
+                    position     = Position.Absolute,
+                    overflow     = Overflow.Hidden,
+                    paddingLeft  = 0, paddingRight  = 0,
+                    marginLeft   = 0, marginRight   = 0,
+                }
+            };
+            l.AddToClassList(ussClass);
+            return l;
+        }
 
         // ─────────────────────────────────────────────────────────────────────
         //  Color resolve
@@ -1873,7 +2031,7 @@ namespace BarGraph.Core
         {
             // default(Color32) == (0,0,0,0) → use default bar colour
             bool isDefault = c.r == 0 && c.g == 0 && c.b == 0 && c.a == 0;
-            Color32 resolved = isDefault ? (Color32)_settings.DefaultBarColor : c;
+            Color32 resolved = isDefault ? (Color32)_vis.DefaultBarColor : c;
 
             if (alpha < 0.999f)
             {

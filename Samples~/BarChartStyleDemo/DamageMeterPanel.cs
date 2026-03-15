@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 using BarGraph.Core;
 
 namespace BarGraph.StyleDemo
@@ -23,20 +24,14 @@ namespace BarGraph.StyleDemo
 
         public DamageMeterPanel() : base("Damage Meter", new PanelTheme
         {
-            CardBackground = new Color(0.08f, 0.04f, 0.04f),
-            CardBorder     = new Color(0.3f,  0.1f,  0.1f),
-            TitleColor     = new Color(0.9f,  0.85f, 0.8f),
-            GraphSettings  = new BarGraphSettings
+            CardBackground   = new Color(0.08f, 0.04f, 0.04f),
+            CardBorder       = new Color(0.3f,  0.1f,  0.1f),
+            TitleColor       = new Color(0.9f,  0.85f, 0.8f),
+            ThemeClassName   = "bar-graph--damage-meter",
+            ThemeStyleSheet  = Resources.Load<StyleSheet>("DamageMeter"),
+            BehaviorSettings = new BarGraphSettings
             {
-                BackgroundColor     = new Color(0.06f, 0.03f, 0.03f),
-                AxisColor           = new Color(0.4f,  0.25f, 0.25f),
-                GridLineColor       = new Color(0.2f,  0.08f, 0.08f),
-                LabelColor          = new Color(0.85f, 0.8f,  0.75f),
-                SelectionRimColor   = new Color(1f,    0.3f,  0.2f, 0.9f),
-                PaddingBottom       = 56,
-                XLabelWidth         = 80,
-                MaxXLabels          = 15,
-                BarSpacingRatio     = 0.15f,
+                MaxXLabels = 15,
             }
         })
         { }

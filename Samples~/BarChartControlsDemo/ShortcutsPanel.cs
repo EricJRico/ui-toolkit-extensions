@@ -16,7 +16,6 @@ namespace BarGraph.ControlsDemo
                 EnableMousePan   = true,
                 EnableYPan       = true,
                 EnableSelection  = true,
-                BarSpacingRatio  = 0.12f,
             })
         { }
 

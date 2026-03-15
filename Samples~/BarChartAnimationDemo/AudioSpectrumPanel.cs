@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 using BarGraph.Core;
 
 namespace BarGraph.AnimationDemo
@@ -23,26 +24,17 @@ namespace BarGraph.AnimationDemo
 
         public AudioSpectrumPanel() : base("Frequency Visualizer", new AnimationPanelTheme
         {
-            CardBackground = new Color(0.05f, 0.03f, 0.08f),
-            CardBorder     = new Color(0.25f, 0.1f,  0.35f),
-            TitleColor     = new Color(0.95f, 0.7f,  0.95f),
-            GraphSettings  = new BarGraphSettings
+            CardBackground  = new Color(0.05f, 0.03f, 0.08f),
+            CardBorder      = new Color(0.25f, 0.1f,  0.35f),
+            TitleColor      = new Color(0.95f, 0.7f,  0.95f),
+            ThemeClassName  = "audio-spectrum-theme",
+            ThemeStyleSheet = Resources.Load<StyleSheet>("AudioSpectrumTheme"),
+            BehaviorSettings = new BarGraphSettings
             {
-                BackgroundColor   = new Color(0.02f, 0.01f, 0.03f),
-                AxisColor         = new Color(0.15f, 0.05f, 0.20f),
-                GridLineColor     = new Color(0.08f, 0.04f, 0.10f),
-                LabelColor        = new Color(0.7f,  0.5f,  0.8f),
-                SelectionRimColor = new Color(0.8f,  0.3f,  1f, 0.9f),
-                FocusRimColor     = new Color(1f,    0.5f,  1f, 1f),
-                ShowGrid          = false,
-                ShowAxes          = false,
-                BarSpacingRatio   = 0.08f,
-                MinValue          = 0f,
-                MaxValue          = 100f,
-                PaddingLeft       = 12f,
-                PaddingRight      = 12f,
-                PaddingTop        = 8f,
-                PaddingBottom     = 8f,
+                ShowGrid = false,
+                ShowAxes = false,
+                MinValue = 0f,
+                MaxValue = 100f,
             }
         })
         { }

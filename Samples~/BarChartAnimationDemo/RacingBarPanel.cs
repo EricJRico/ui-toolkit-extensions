@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 using BarGraph.Core;
 
 namespace BarGraph.AnimationDemo
@@ -35,21 +36,14 @@ namespace BarGraph.AnimationDemo
 
         public RacingBarPanel() : base("Market Cap Race", new AnimationPanelTheme
         {
-            CardBackground = new Color(0.04f, 0.05f, 0.10f),
-            CardBorder     = new Color(0.6f,  0.5f,  0.2f),
-            TitleColor     = new Color(0.9f,  0.85f, 0.6f),
-            GraphSettings  = new BarGraphSettings
+            CardBackground  = new Color(0.04f, 0.05f, 0.10f),
+            CardBorder      = new Color(0.6f,  0.5f,  0.2f),
+            TitleColor      = new Color(0.9f,  0.85f, 0.6f),
+            ThemeClassName  = "racing-bar-theme",
+            ThemeStyleSheet = Resources.Load<StyleSheet>("RacingBarTheme"),
+            BehaviorSettings = new BarGraphSettings
             {
-                BackgroundColor   = new Color(0.03f, 0.04f, 0.09f),
-                AxisColor         = new Color(0.6f,  0.5f,  0.25f),
-                GridLineColor     = new Color(0.12f, 0.12f, 0.20f),
-                LabelColor        = new Color(0.85f, 0.82f, 0.7f),
-                SelectionRimColor = new Color(0.9f,  0.75f, 0.2f, 0.9f),
-                FocusRimColor     = new Color(1f,    0.9f,  0.4f, 1f),
-                PaddingBottom     = 56,
-                XLabelWidth       = 80,
-                MaxXLabels        = 12,
-                BarSpacingRatio   = 0.15f,
+                MaxXLabels = 12,
             }
         })
         { }

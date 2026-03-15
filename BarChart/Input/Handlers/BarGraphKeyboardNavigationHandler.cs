@@ -83,7 +83,7 @@ namespace BarGraph.Input.Handlers
             // Anchor to the center of the visible range
             float barStride = _element.GetBarStrideBase();
             float plotW     = _element.GetPlotWidth();
-            float centerX   = settings.PaddingLeft + plotW * 0.5f;
+            float centerX   = _element.VisPaddingLeft + plotW * 0.5f;
             float dataX     = vs.PanX + centerX / (barStride * vs.ZoomX);
             float newPanX   = dataX - centerX / (barStride * newZoom);
 

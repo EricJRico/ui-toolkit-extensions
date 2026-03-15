@@ -36,7 +36,7 @@ namespace BarGraph.Input.Handlers
 
             // Anchor the bar column under the cursor so it stays stationary
             float barStride = _element.GetBarStrideBase();
-            float localX    = anchor.x - _element.Settings.PaddingLeft;
+            float localX    = anchor.x - _element.VisPaddingLeft;
             float dataX     = vs.PanX + localX / (barStride * vs.ZoomX);
             float newPanX   = dataX - localX / (barStride * newZoom);
 
@@ -53,7 +53,7 @@ namespace BarGraph.Input.Handlers
 
             // Anchor the Y value under the cursor so it stays stationary
             float plotH  = _element.GetPlotHeight();
-            float plotY2 = _element.contentRect.height - _element.Settings.PaddingBottom;
+            float plotY2 = _element.contentRect.height - _element.VisPaddingBottom;
             float t      = Mathf.Clamp01((plotY2 - anchor.y) / Mathf.Max(1f, plotH));
             float newPanY = newZoom * (vs.PanY + t) / vs.ZoomY - t;
 

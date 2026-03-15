@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.UIElements;
 using BarGraph.Core;
@@ -9,6 +8,10 @@ namespace BarGraph.ControlsDemo
     /// <summary>
     /// Base class for controls cheat-sheet panels.
     /// Each panel has a small graph, instruction text, and a live status label.
+    ///
+    /// Visual/appearance properties are controlled via USS custom properties
+    /// loaded from <c>Resources/ControlsDemo.uss</c>.
+    /// Only behavioural settings are passed via <see cref="BarGraphSettings"/>.
     /// </summary>
     abstract class ControlsDemoPanel
     {
@@ -25,7 +28,10 @@ namespace BarGraph.ControlsDemo
         private static readonly Color InstrColor    = new Color(0.50f, 0.55f, 0.65f);
         private static readonly Color StatusColor   = new Color(0.40f, 0.85f, 0.55f);
 
-        protected ControlsDemoPanel(string title, string instruction, BarGraphSettings settings)
+        private static readonly StyleSheet SharedThemeSheet =
+            Resources.Load<StyleSheet>("ControlsDemo");
+
+        protected ControlsDemoPanel(string title, string instruction, BarGraphSettings behaviorSettings)
         {
             Title = title;
 
@@ -70,7 +76,15 @@ namespace BarGraph.ControlsDemo
             Graph.style.borderBottomLeftRadius = Graph.style.borderBottomRightRadius = 3;
             Graph.focusable = true;
 
-            Graph.UpdateSettings(settings);
+            // Apply USS theme for visual properties
+            if (SharedThemeSheet != null)
+                Graph.styleSheets.Add(SharedThemeSheet);
+            Graph.AddToClassList("bar-graph--controls-demo");
+
+            // Apply behavioral-only settings
+            if (behaviorSettings != null)
+                Graph.UpdateSettings(behaviorSettings);
+
             Graph.SetInputSource(new BarGraphUIToolkitInput());
             Graph.AddManipulator(new NavigationSuppressor());
 

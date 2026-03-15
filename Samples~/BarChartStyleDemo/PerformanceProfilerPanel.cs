@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 using BarGraph.Core;
 
 namespace BarGraph.StyleDemo
@@ -16,28 +17,14 @@ namespace BarGraph.StyleDemo
 
         static PanelTheme MakeTheme() => new PanelTheme
         {
-            CardBackground = new Color(0.04f, 0.05f, 0.08f),
-            CardBorder     = new Color(0.12f, 0.14f, 0.2f),
-            TitleColor     = new Color(0.4f, 0.9f, 0.4f),
-            GraphSettings  = new BarGraphSettings
+            CardBackground   = new Color(0.04f, 0.05f, 0.08f),
+            CardBorder       = new Color(0.12f, 0.14f, 0.2f),
+            TitleColor       = new Color(0.4f, 0.9f, 0.4f),
+            ThemeClassName   = "bar-graph--performance-profiler",
+            ThemeStyleSheet  = Resources.Load<StyleSheet>("PerformanceProfiler"),
+            BehaviorSettings = new BarGraphSettings
             {
-                BackgroundColor     = new Color(0.03f, 0.03f, 0.05f),
-                DefaultBarColor     = new Color(0.25f, 0.6f, 1f),
-                AxisColor           = new Color(0.3f, 0.35f, 0.45f),
-                GridLineColor       = new Color(0.1f, 0.1f, 0.15f),
-                LabelColor          = new Color(0.65f, 0.7f, 0.8f),
-                HoverTintColor      = new Color(1f, 1f, 1f, 0.18f),
-                SelectionFillColor  = new Color(1f, 1f, 1f, 0.22f),
-                SelectionRimColor   = new Color(0f, 0.9f, 1f, 0.9f),
-                DragRectFillColor   = new Color(0f, 0.7f, 0.9f, 0.08f),
-                DragRectBorderColor = new Color(0f, 0.7f, 0.9f, 0.6f),
-                ShowGrid            = true,
-                GridLineCount       = 4,
-                PaddingBottom       = 32f,
-                XLabelWidth         = 40f,
-                MaxXLabels          = 12,
-                BarSpacingRatio     = 0.05f,
-                MinBarWidthPx       = 1f
+                GridLineCount = 4,
             }
         };
 

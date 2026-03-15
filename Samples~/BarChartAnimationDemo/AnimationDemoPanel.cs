@@ -9,10 +9,12 @@ namespace BarGraph.AnimationDemo
 {
     struct AnimationPanelTheme
     {
-        public Color CardBackground;
-        public Color CardBorder;
-        public Color TitleColor;
-        public BarGraphSettings GraphSettings;
+        public Color      CardBackground;
+        public Color      CardBorder;
+        public Color      TitleColor;
+        public string     ThemeClassName;
+        public StyleSheet ThemeStyleSheet;
+        public BarGraphSettings BehaviorSettings;
     }
 
     /// <summary>
@@ -85,7 +87,12 @@ namespace BarGraph.AnimationDemo
             Graph.style.borderTopLeftRadius  = Graph.style.borderTopRightRadius  =
             Graph.style.borderBottomLeftRadius = Graph.style.borderBottomRightRadius = 3;
 
-            Graph.UpdateSettings(theme.GraphSettings);
+            if (theme.ThemeStyleSheet != null)
+                Graph.styleSheets.Add(theme.ThemeStyleSheet);
+            if (!string.IsNullOrEmpty(theme.ThemeClassName))
+                Graph.AddToClassList(theme.ThemeClassName);
+            if (theme.BehaviorSettings != null)
+                Graph.UpdateSettings(theme.BehaviorSettings);
 
             Graph.SetInputSource(new BarGraphUIToolkitInput());
             Graph.AddHandler(new BarGraphHoverHandler());

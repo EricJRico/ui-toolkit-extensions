@@ -8,14 +8,18 @@ using BarGraph.Input.Handlers;
 namespace BarGraph.StyleDemo
 {
     /// <summary>
-    /// Per-panel visual identity applied to card chrome and graph settings.
+    /// Per-panel visual identity applied to card chrome and graph.
+    /// Visual/appearance properties live in USS theme files;
+    /// only behavioural properties remain in <see cref="BehaviorSettings"/>.
     /// </summary>
     struct PanelTheme
     {
-        public Color CardBackground;
-        public Color CardBorder;
-        public Color TitleColor;
-        public BarGraphSettings GraphSettings;
+        public Color      CardBackground;
+        public Color      CardBorder;
+        public Color      TitleColor;
+        public string     ThemeClassName;      // e.g. "bar-graph--damage-meter"
+        public StyleSheet ThemeStyleSheet;     // loaded from Resources
+        public BarGraphSettings BehaviorSettings;  // behavioral only
     }
 
     /// <summary>
@@ -86,7 +90,12 @@ namespace BarGraph.StyleDemo
             Graph.style.borderTopLeftRadius  = Graph.style.borderTopRightRadius  =
             Graph.style.borderBottomLeftRadius = Graph.style.borderBottomRightRadius = 3;
 
-            Graph.UpdateSettings(theme.GraphSettings);
+            if (theme.ThemeStyleSheet != null)
+                Graph.styleSheets.Add(theme.ThemeStyleSheet);
+            if (!string.IsNullOrEmpty(theme.ThemeClassName))
+                Graph.AddToClassList(theme.ThemeClassName);
+            if (theme.BehaviorSettings != null)
+                Graph.UpdateSettings(theme.BehaviorSettings);
 
             Graph.SetInputSource(new BarGraphUIToolkitInput());
             Graph.AddHandler(new BarGraphHoverHandler());
