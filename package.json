@@ -26,6 +26,11 @@
             "displayName": "Bar Chart Editor Window Demo",
             "description": "EditorWindow gallery with animation playback, all dataset types, and up to 1000 stacked segments with HSL color rotation.",
             "path": "Samples~/BarChartEditorWindowDemo"
+        },
+        {
+            "displayName": "Bar Chart Game Style Demo",
+            "description": "Four game-themed panels demonstrating custom visual styling: damage meter, resource economy, performance profiler, and leaderboard.",
+            "path": "Samples~/BarChartStyleDemo"
         }
     ]
 }

@@ -1,0 +1,16 @@
+{
+    "name": "BarChartStyleDemo",
+    "rootNamespace": "BarGraph.StyleDemo",
+    "references": [
+        "GUID:aa3977563a43eca4c9090c940ed49a07"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

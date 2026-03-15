@@ -725,6 +725,20 @@ namespace BarGraph.Core
                               out int startDisp, out int endDisp);
                 int viewCount = endDisp - startDisp;
 
+                // Pre-size quad buffer to avoid repeated Array.Resize during
+                // the draw pass.  Direct path: segment merge caps output at
+                // ~plotH quads per bar.  LOD path: bounded by pixel count.
+                // Overlay may add a similar amount — multiply by 2 if present.
+                if (viewCount > 0)
+                {
+                    int estimatedQuads = stride >= 1f
+                        ? viewCount * Mathf.CeilToInt(plotH)
+                        : Mathf.CeilToInt(plotW);
+                    if (_model.HasOverlay) estimatedQuads *= 2;
+                    if (_quadBuf.Length < estimatedQuads)
+                        _quadBuf = new QuadData[Mathf.Max(_quadBuf.Length * 2, estimatedQuads)];
+                }
+
                 if (viewCount > 0)
                 {
                     if (stride >= 1f)
@@ -1257,13 +1271,17 @@ namespace BarGraph.Core
                 lbl.visible = true;
             }
 
-            // X-axis bar labels — show as many as fit without overlapping
+            // X-axis bar labels — show as many as fit without overlapping.
+            // Ensure minimum bar-step so labels never crowd closer than XLabelWidth pixels.
             CalcViewSlice(plotW, out float stride, out _, out int startDisp, out int endDisp);
-            int viewCnt    = endDisp - startDisp;
-            int showCount  = _settings.XLabelWidth > 0
-                ? Mathf.Min(_xLabels.Count, Mathf.FloorToInt(plotW / _settings.XLabelWidth))
+            int viewCnt  = endDisp - startDisp;
+            int minStep  = _settings.XLabelWidth > 0 && stride > 0
+                ? Mathf.Max(1, Mathf.CeilToInt(_settings.XLabelWidth / stride))
+                : 1;
+            int showCount = _settings.XLabelWidth > 0 && viewCnt > 0
+                ? Mathf.Min(_xLabels.Count, 1 + (viewCnt - 1) / minStep)
                 : 0;
-            bool show = showCount > 0 && viewCnt > 0;
+            bool show = showCount > 0;
 
             for (int j = 0; j < _xLabels.Count; j++)
             {
@@ -1520,11 +1538,9 @@ namespace BarGraph.Core
                 int idxCount   = chunkQuads * INDICES_PER_QUAD;
 
                 // Pass Texture2D.whiteTexture so that texture × tint = tint.
-                // Must remap UVs into uvRegion in case the atlas repacks it.
+                // UV coordinates are automatically remapped by the renderer.
                 MeshWriteData mwd = mgc.Allocate(vertCount, idxCount, Texture2D.whiteTexture);
-                Vector2 uv = new Vector2(
-                    mwd.uvRegion.x + mwd.uvRegion.width  * 0.5f,
-                    mwd.uvRegion.y + mwd.uvRegion.height * 0.5f);
+                Vector2 uv = new Vector2(0.5f, 0.5f);
 
                 for (int i = 0; i < chunkQuads; i++)
                 {

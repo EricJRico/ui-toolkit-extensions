@@ -62,7 +62,7 @@ namespace BarGraph.Core
         public int   MaxXLabels    = 12;
         public int   MaxYLabels    = 6;
         public int   LabelFontSize = 10;
-        public float LabelHeight   = 14f;
+        public float LabelHeight   = 18f;
         public float XLabelWidth   = 40f;
         public float XLabelOffsetY = 3f;
         public float YLabelGap     = 4f;
