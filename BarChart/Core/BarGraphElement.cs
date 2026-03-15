@@ -558,8 +558,8 @@ namespace BarGraph.Core
             if (displayIdx < 0 || displayIdx >= _model.BarCount) return -1;
 
             // Confirm cursor is on the bar, not the gap
-            float barStartX = plotX + (displayIdx - _viewState.PanX) * stride;
-            if (localPos.x < barStartX || localPos.x > barStartX + barW) return -1;
+            SnapBarX(displayIdx, plotX, stride, barW, out float barStartX, out float snapW);
+            if (localPos.x < barStartX || localPos.x > barStartX + snapW) return -1;
 
             // Resolve display → data
             EnsureSortMap();
@@ -851,7 +851,7 @@ namespace BarGraph.Core
                 if (dataIdx >= barCount) continue;
 
                 ref readonly BarEntry bar = ref bars[dataIdx];
-                float x       = plotX + (dispIdx - _viewState.PanX) * stride;
+                SnapBarX(dispIdx, plotX, stride, barW, out float x, out float bw);
                 float yBottom = plotY2 + yOffset;   // +yOffset shifts range up when panned
 
                 // ── Segment-level LOD merge state (zero allocation) ─────────
@@ -893,7 +893,7 @@ namespace BarGraph.Core
                                 float drawTop = Mathf.Max(mYTop, plotTop);
                                 float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
                                 if (drawH >= 0.5f)
-                                    AddQuad(mergeColor, x, drawTop, barW, drawH);
+                                    AddQuad(mergeColor, x, drawTop, bw, drawH);
                             }
                             yBottom     = mYTop;
                             mergeH      = 0f;
@@ -914,7 +914,7 @@ namespace BarGraph.Core
                             float drawTop = Mathf.Max(mYTop, plotTop);
                             float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
                             if (drawH >= 0.5f)
-                                AddQuad(mergeColor, x, drawTop, barW, drawH);
+                                AddQuad(mergeColor, x, drawTop, bw, drawH);
                         }
                         yBottom     = mYTop;
                         mergeH      = 0f;
@@ -934,7 +934,7 @@ namespace BarGraph.Core
                     if (sDrawH < 0.5f) { yBottom = yTop; continue; }
 
                     Color32 sc = ResolveSegmentColor(seg.Color, alpha);
-                    AddQuad(sc, x, sDrawTop, barW, sDrawH);
+                    AddQuad(sc, x, sDrawTop, bw, sDrawH);
                     yBottom = yTop;
                 }
 
@@ -947,7 +947,7 @@ namespace BarGraph.Core
                         float drawTop = Mathf.Max(mYTop, plotTop);
                         float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
                         if (drawH >= 0.5f)
-                            AddQuad(mergeColor, x, drawTop, barW, drawH);
+                            AddQuad(mergeColor, x, drawTop, bw, drawH);
                     }
                 }
             }
@@ -1090,8 +1090,8 @@ namespace BarGraph.Core
                         int dataIdx = dispIdx < _viewState.DisplayToData.Length
                             ? _viewState.DisplayToData[dispIdx] : dispIdx;
                         if (!_viewState.SelectedBars.Contains(dataIdx)) continue;
-                        float x = plotX + (dispIdx - _viewState.PanX) * stride;
-                        PathRect(p, x, selY, barW, plotH);
+                        SnapBarX(dispIdx, plotX, stride, barW, out float sx, out float sw);
+                        PathRect(p, sx, selY, sw, plotH);
                     }
                     p.Fill(FillRule.OddEven);
 
@@ -1127,10 +1127,11 @@ namespace BarGraph.Core
                     {
                         int rs = _selectionRuns[i];
                         int re = _selectionRuns[i + 1];
-                        float x = plotX + (rs - _viewState.PanX) * stride;
-                        float w = (re - rs - 1) * stride + barW;
+                        SnapBarX(rs,     plotX, stride, barW, out float rx, out _);
+                        SnapBarX(re - 1, plotX, stride, barW, out float ex, out float ew);
+                        float w = ex + ew - rx;
                         p.BeginPath();
-                        PathRect(p, x, selY, w, plotH);
+                        PathRect(p, rx, selY, w, plotH);
                         p.Stroke();
                     }
                 }
@@ -1142,12 +1143,12 @@ namespace BarGraph.Core
             {
                 int displayIdx = focIdx < _viewState.DataToDisplay.Length
                     ? _viewState.DataToDisplay[focIdx] : focIdx;
-                float x = plotX + (displayIdx - _viewState.PanX) * stride;
+                SnapBarX(displayIdx, plotX, stride, barW, out float fx, out float fw);
 
                 p.strokeColor = _settings.FocusRimColor;
                 p.lineWidth   = 2f;
                 p.BeginPath();
-                PathRect(p, x - 1f, plotY2 - plotH - 1f, barW + 2f, plotH + 2f);
+                PathRect(p, fx - 1f, plotY2 - plotH - 1f, fw + 2f, plotH + 2f);
                 p.Stroke();
             }
 
@@ -1157,14 +1158,14 @@ namespace BarGraph.Core
             {
                 int displayIdx = hovIdx < _viewState.DataToDisplay.Length
                     ? _viewState.DataToDisplay[hovIdx] : hovIdx;
-                float x = plotX + (displayIdx - _viewState.PanX) * stride;
+                SnapBarX(displayIdx, plotX, stride, barW, out float hx, out float hw);
 
                 // In LOD mode use a 1 px wide tint; in normal mode use the full barW.
-                float hw = lodMode ? 1f : barW;
+                if (lodMode) hw = 1f;
 
                 p.fillColor = _settings.HoverTintColor;
                 p.BeginPath();
-                PathRect(p, x, plotY2 - plotH, hw, plotH);
+                PathRect(p, hx, plotY2 - plotH, hw, plotH);
                 p.Fill();
             }
         }
@@ -1271,17 +1272,13 @@ namespace BarGraph.Core
                 lbl.visible = true;
             }
 
-            // X-axis bar labels — show as many as fit without overlapping.
-            // Ensure minimum bar-step so labels never crowd closer than XLabelWidth pixels.
-            CalcViewSlice(plotW, out float stride, out _, out int startDisp, out int endDisp);
-            int viewCnt  = endDisp - startDisp;
-            int minStep  = _settings.XLabelWidth > 0 && stride > 0
-                ? Mathf.Max(1, Mathf.CeilToInt(_settings.XLabelWidth / stride))
-                : 1;
-            int showCount = _settings.XLabelWidth > 0 && viewCnt > 0
-                ? Mathf.Min(_xLabels.Count, 1 + (viewCnt - 1) / minStep)
+            // X-axis bar labels — show as many as fit without overlapping
+            CalcViewSlice(plotW, out float stride, out float barW, out int startDisp, out int endDisp);
+            int viewCnt    = endDisp - startDisp;
+            int showCount  = _settings.XLabelWidth > 0
+                ? Mathf.Min(_xLabels.Count, Mathf.FloorToInt(plotW / _settings.XLabelWidth))
                 : 0;
-            bool show = showCount > 0;
+            bool show = showCount > 0 && viewCnt > 0;
 
             for (int j = 0; j < _xLabels.Count; j++)
             {
@@ -1302,7 +1299,8 @@ namespace BarGraph.Core
                 }
                 text ??= dispIdx.ToString();
 
-                float x  = plotX + (dispIdx - _viewState.PanX) * stride + stride * 0.5f;
+                SnapBarX(dispIdx, plotX, stride, barW, out float sx, out float sw);
+                float x = sx + sw * 0.5f;
                 lbl.text = text;
                 lbl.style.left   = x - _settings.XLabelWidth * 0.5f;
                 lbl.style.top    = plotY2 + _settings.XLabelOffsetY;
@@ -1381,6 +1379,50 @@ namespace BarGraph.Core
         }
 
         // ─────────────────────────────────────────────────────────────────────
+        //  Pixel-snap helper (shared by draw, hit-test, highlights, labels)
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Computes the pixel-perfect X position and width for bar at
+        /// <paramref name="dispIdx"/> using a single Bresenham distribution
+        /// over slot positions: <c>slotEdge(i) = floor(i * totalPx / N)</c>.
+        ///
+        /// Each slot is either <c>floor(totalPx/N)</c> or that +1 pixel wide,
+        /// with the extra pixels maximally spread.  The gap within each slot
+        /// is a fixed integer, so all gaps are identical.  Bar width absorbs
+        /// the ±1 px slot variation, which is visually masked by the color fill.
+        ///
+        /// Guarantees:
+        ///  • <c>slotRight[i] == slotLeft[i+1]</c> — slots tile perfectly.
+        ///  • All gaps are exactly the same pixel width.
+        ///  • Bar widths differ by at most 1 px, variation maximally spread.
+        ///  • Total coverage == virtual canvas width (no remainder).
+        /// </summary>
+        private void SnapBarX(int dispIdx, float plotX, float stride, float barW,
+                              out float snapX, out float snapW)
+        {
+            int N = _model.BarCount;
+            if (N <= 0) { snapX = plotX; snapW = 1f; return; }
+
+            // Total virtual pixel width for all slots at current zoom.
+            int totalPx = Mathf.RoundToInt(N * stride);
+
+            // Fixed integer gap — same for every slot.
+            int gapPx = Mathf.Max(0, Mathf.RoundToInt(stride - barW));
+
+            // Bresenham: left edge of this slot and next slot.
+            int slotLeft  = (int)((long)dispIdx       * totalPx / N);
+            int slotRight = (int)((long)(dispIdx + 1) * totalPx / N);
+            int slotW     = slotRight - slotLeft;
+
+            // Bar fills the slot minus the fixed gap.
+            int bw = Mathf.Max(1, slotW - gapPx);
+
+            snapX = plotX + slotLeft - _viewState.PanX * stride;
+            snapW = bw;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
         //  Drag-select hit collection
         // ─────────────────────────────────────────────────────────────────────
 
@@ -1445,9 +1487,9 @@ namespace BarGraph.Core
             // Normal mode: walk visible display indices, early-exit on x > rect.xMax.
             for (int dispIdx = startDisp; dispIdx < endDisp; dispIdx++)
             {
-                float x = plotX + (dispIdx - _viewState.PanX) * stride;
-                if (x + barW < rect.xMin) continue;
-                if (x > rect.xMax)        break;
+                SnapBarX(dispIdx, plotX, stride, barW, out float x, out float bw);
+                if (x + bw < rect.xMin) continue;
+                if (x > rect.xMax)      break;
 
                 int dataIdx = dispIdx < _viewState.DisplayToData.Length
                     ? _viewState.DisplayToData[dispIdx] : dispIdx;
@@ -1456,7 +1498,7 @@ namespace BarGraph.Core
                 float barH    = Mathf.Min(_model.Bars[dataIdx].TotalValue /
                                           _effectiveMaxY * plotH * _viewState.ZoomY, plotH);
                 float barTopY = plotY2 - barH;
-                var   barRect = new Rect(x, barTopY, barW, barH);
+                var   barRect = new Rect(x, barTopY, bw, barH);
 
                 if (rect.Overlaps(barRect))
                     result.Add(dataIdx);
@@ -1538,9 +1580,11 @@ namespace BarGraph.Core
                 int idxCount   = chunkQuads * INDICES_PER_QUAD;
 
                 // Pass Texture2D.whiteTexture so that texture × tint = tint.
-                // UV coordinates are automatically remapped by the renderer.
+                // Must remap UVs into uvRegion in case the atlas repacks it.
                 MeshWriteData mwd = mgc.Allocate(vertCount, idxCount, Texture2D.whiteTexture);
-                Vector2 uv = new Vector2(0.5f, 0.5f);
+                Vector2 uv = new Vector2(
+                    mwd.uvRegion.x + mwd.uvRegion.width  * 0.5f,
+                    mwd.uvRegion.y + mwd.uvRegion.height * 0.5f);
 
                 for (int i = 0; i < chunkQuads; i++)
                 {

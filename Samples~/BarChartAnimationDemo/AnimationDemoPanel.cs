@@ -1,0 +1,256 @@
+using System;
+using UnityEngine;
+using UnityEngine.UIElements;
+using BarGraph.Core;
+using BarGraph.Input;
+using BarGraph.Input.Handlers;
+
+namespace BarGraph.AnimationDemo
+{
+    struct AnimationPanelTheme
+    {
+        public Color CardBackground;
+        public Color CardBorder;
+        public Color TitleColor;
+        public BarGraphSettings GraphSettings;
+    }
+
+    /// <summary>
+    /// Abstract base for animation demo panels.
+    /// Provides themed card chrome, graph setup, play/pause state, and common controls.
+    /// </summary>
+    abstract class AnimationDemoPanel
+    {
+        // ── Public accessors ────────────────────────────────────────────────
+        public VisualElement   Card  { get; }
+        public BarGraphElement Graph { get; }
+        public string          Title { get; }
+
+        // ── Animation state ────────────────────────────────────────────────
+        protected bool  IsPlaying = true;
+        protected float Speed     = 1f;
+        protected float Elapsed;
+
+        // ── Internal references ─────────────────────────────────────────────
+        protected readonly Label          TitleLabel;
+        protected readonly VisualElement  ControlsRow;
+        protected readonly VisualElement  SlidersRow;
+        protected readonly VisualElement  ButtonsRow;
+
+        // ── Construction ────────────────────────────────────────────────────
+
+        protected AnimationDemoPanel(string title, AnimationPanelTheme theme)
+        {
+            Title = title;
+
+            // Card container
+            Card = new VisualElement();
+            Card.style.backgroundColor     = theme.CardBackground;
+            Card.style.borderTopLeftRadius  = Card.style.borderTopRightRadius  =
+            Card.style.borderBottomLeftRadius = Card.style.borderBottomRightRadius = 4;
+            Card.style.borderTopWidth = Card.style.borderRightWidth =
+            Card.style.borderBottomWidth = Card.style.borderLeftWidth = 1;
+            Card.style.borderTopColor = Card.style.borderRightColor =
+            Card.style.borderBottomColor = Card.style.borderLeftColor = theme.CardBorder;
+            Card.style.paddingTop    = 6;
+            Card.style.paddingBottom = 6;
+            Card.style.paddingLeft   = 6;
+            Card.style.paddingRight  = 6;
+            Card.style.flexDirection = FlexDirection.Column;
+
+            // Flex sizing for 2-column grid
+            Card.style.flexBasis = new StyleLength(Length.Percent(48));
+            Card.style.minWidth  = 400;
+            Card.style.flexGrow  = 1;
+            Card.style.marginTop = Card.style.marginBottom =
+            Card.style.marginLeft = Card.style.marginRight = 6;
+
+            // Title
+            TitleLabel = new Label(title)
+            {
+                style =
+                {
+                    fontSize               = 11,
+                    color                  = theme.TitleColor,
+                    marginBottom           = 4,
+                    unityFontStyleAndWeight = FontStyle.Bold
+                }
+            };
+            Card.Add(TitleLabel);
+
+            // Graph
+            Graph = new BarGraphElement();
+            Graph.style.flexGrow  = 1;
+            Graph.style.minHeight = 160;
+            Graph.style.borderTopLeftRadius  = Graph.style.borderTopRightRadius  =
+            Graph.style.borderBottomLeftRadius = Graph.style.borderBottomRightRadius = 3;
+
+            Graph.UpdateSettings(theme.GraphSettings);
+
+            Graph.SetInputSource(new BarGraphUIToolkitInput());
+            Graph.AddHandler(new BarGraphHoverHandler());
+            Graph.AddHandler(new BarGraphSelectionHandler());
+            Graph.AddHandler(new BarGraphPanHandler());
+            Graph.AddHandler(new BarGraphZoomHandler());
+
+            Card.Add(Graph);
+
+            // Controls area
+            ControlsRow = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Column,
+                    marginTop     = 4
+                }
+            };
+
+            SlidersRow = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    flexWrap      = Wrap.Wrap
+                }
+            };
+            ControlsRow.Add(SlidersRow);
+
+            ButtonsRow = new VisualElement
+            {
+                style =
+                {
+                    flexDirection = FlexDirection.Row,
+                    flexWrap      = Wrap.Wrap,
+                    marginTop     = 2
+                }
+            };
+            ControlsRow.Add(ButtonsRow);
+
+            Card.Add(ControlsRow);
+
+            BuildControls();
+        }
+
+        // ── Subclass hooks ──────────────────────────────────────────────────
+
+        protected abstract void BuildControls();
+        public abstract void Regenerate();
+        public abstract void OnUpdate(float dt);
+
+        // ── Common control helpers ──────────────────────────────────────────
+
+        protected void AddControl(VisualElement control)
+        {
+            if (control is BaseSlider<int> || control is BaseSlider<float>
+                || control.ClassListContains("demo-slider"))
+                SlidersRow.Add(control);
+            else
+                ButtonsRow.Add(control);
+        }
+
+        protected Button MakeButton(string label, Action action)
+        {
+            var b = new Button(action) { text = label };
+            b.style.marginRight  = b.style.marginBottom = 3;
+            b.style.paddingLeft  = b.style.paddingRight  = 8;
+            b.style.paddingTop   = b.style.paddingBottom = 2;
+            b.style.height       = 20;
+            b.style.fontSize     = 10;
+            return b;
+        }
+
+        protected Button MakeToggleButton(string labelOn, string labelOff,
+            bool initial, Action<bool> onChanged)
+        {
+            bool state = initial;
+            var btn = new Button();
+            btn.text = state ? labelOn : labelOff;
+            btn.style.marginRight  = btn.style.marginBottom = 3;
+            btn.style.paddingLeft  = btn.style.paddingRight  = 8;
+            btn.style.paddingTop   = btn.style.paddingBottom = 2;
+            btn.style.height       = 20;
+            btn.style.fontSize     = 10;
+            btn.clicked += () =>
+            {
+                state = !state;
+                btn.text = state ? labelOn : labelOff;
+                onChanged(state);
+            };
+            return btn;
+        }
+
+        private static readonly Color LabelColor = new Color(0.72f, 0.72f, 0.76f, 1f);
+
+        private VisualElement MakeSliderGroup(string label, VisualElement slider)
+        {
+            var group = new VisualElement();
+            group.AddToClassList("demo-slider");
+            group.style.flexDirection = FlexDirection.Row;
+            group.style.alignItems   = Align.Center;
+            group.style.minWidth     = 180;
+            group.style.flexGrow     = 1;
+            group.style.maxWidth     = 280;
+            group.style.marginRight  = 6;
+
+            var lbl = new Label(label);
+            lbl.style.fontSize = 10;
+            lbl.style.color    = LabelColor;
+            lbl.style.minWidth = 40;
+            group.Add(lbl);
+
+            slider.style.flexGrow = 1;
+            group.Add(slider);
+
+            var valueLbl = new Label();
+            valueLbl.style.fontSize       = 10;
+            valueLbl.style.color          = LabelColor;
+            valueLbl.style.minWidth       = 32;
+            valueLbl.style.unityTextAlign = TextAnchor.MiddleRight;
+            group.Add(valueLbl);
+
+            if (slider is SliderInt si)
+            {
+                valueLbl.text = si.value.ToString();
+                si.RegisterValueChangedCallback(e => valueLbl.text = e.newValue.ToString());
+            }
+            else if (slider is Slider sf)
+            {
+                valueLbl.text = sf.value.ToString("F1");
+                sf.RegisterValueChangedCallback(e => valueLbl.text = e.newValue.ToString("F1"));
+            }
+
+            return group;
+        }
+
+        protected VisualElement MakeSliderInt(string label, int min, int max, int value,
+            Action<int> onChanged)
+        {
+            var s = new SliderInt(min, max) { value = value };
+            s.RegisterValueChangedCallback(e => onChanged(e.newValue));
+            return MakeSliderGroup(label, s);
+        }
+
+        protected VisualElement MakeSlider(string label, float min, float max, float value,
+            Action<float> onChanged)
+        {
+            var s = new Slider(min, max) { value = value };
+            s.RegisterValueChangedCallback(e => onChanged(e.newValue));
+            return MakeSliderGroup(label, s);
+        }
+
+        protected void AddPlayPauseToggle()
+        {
+            AddControl(MakeToggleButton("Pause", "Play", true, on => IsPlaying = on));
+        }
+
+        protected void AddSpeedSlider(float min = 0.2f, float max = 5f, float initial = 1f)
+        {
+            AddControl(MakeSlider("Speed", min, max, initial, v => Speed = v));
+        }
+
+        protected void AddResetViewButton()
+        {
+            AddControl(MakeButton("Reset View", () => Graph.ResetView()));
+        }
+    }
+}

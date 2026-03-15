@@ -31,6 +31,11 @@
             "displayName": "Bar Chart Game Style Demo",
             "description": "Four game-themed panels demonstrating custom visual styling: damage meter, resource economy, performance profiler, and leaderboard.",
             "path": "Samples~/BarChartStyleDemo"
+        },
+        {
+            "displayName": "Bar Chart Animation Showcase",
+            "description": "Three animated panels: racing bar chart (market cap race), audio spectrum visualizer, and sorting algorithm theater with 5 algorithms.",
+            "path": "Samples~/BarChartAnimationDemo"
         }
     ]
 }
