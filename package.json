@@ -36,6 +36,11 @@
             "displayName": "Bar Chart Animation Showcase",
             "description": "Three animated panels: racing bar chart (market cap race), audio spectrum visualizer, and sorting algorithm theater with 5 algorithms.",
             "path": "Samples~/BarChartAnimationDemo"
+        },
+        {
+            "displayName": "Bar Chart Controls Cheat Sheet",
+            "description": "Six interactive panels teaching WASD navigation, scroll zoom, mouse pan, selection, keyboard focus, and shortcuts with live status feedback.",
+            "path": "Samples~/BarChartControlsDemo"
         }
     ]
 }
