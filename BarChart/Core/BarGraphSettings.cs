@@ -17,6 +17,7 @@ namespace BarGraph.Core
         public Color HoverTintColor      = new Color(1.00f, 1.00f, 1.00f, 0.18f);
         public Color SelectionFillColor  = new Color(1.00f, 1.00f, 1.00f, 0.22f);
         public Color SelectionRimColor   = new Color(0.40f, 0.70f, 1.00f, 0.90f);
+        public float SelectionRimWidth  = 1.5f;
         public Color DragRectFillColor   = new Color(0.35f, 0.65f, 1.00f, 0.08f);
         public Color DragRectBorderColor = new Color(0.35f, 0.65f, 1.00f, 0.60f);
         public Color FocusRimColor       = new Color(1.00f, 0.80f, 0.20f, 1.00f);

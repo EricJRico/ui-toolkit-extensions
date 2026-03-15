@@ -1259,7 +1259,8 @@ namespace BarGraph.Core
                     }
 
                     p.strokeColor = _settings.SelectionRimColor;
-                    p.lineWidth   = 1.5f;
+                    p.lineWidth   = _settings.SelectionRimWidth;
+                    float selInset = p.lineWidth * 0.5f + 0.5f;
                     for (int i = 0; i < _selectionRuns.Count; i += 2)
                     {
                         int rs = _selectionRuns[i];
@@ -1268,7 +1269,7 @@ namespace BarGraph.Core
                         SnapBarX(re - 1, plotX, stride, barW, out float ex, out float ew);
                         float w = ex + ew - rx;
                         p.BeginPath();
-                        PathRect(p, rx, selY, w, plotH);
+                        PathRect(p, rx, selY + selInset, w, plotH - selInset * 2f);
                         p.Stroke();
                     }
                 }
@@ -1284,8 +1285,9 @@ namespace BarGraph.Core
 
                 p.strokeColor = _settings.FocusRimColor;
                 p.lineWidth   = 2f;
+                float focInset = p.lineWidth * 0.5f + 0.5f;
                 p.BeginPath();
-                PathRect(p, fx - 1f, plotY2 - plotH - 1f, fw + 2f, plotH + 2f);
+                PathRect(p, fx - 1f, plotY2 - plotH + focInset, fw + 2f, plotH - focInset * 2f);
                 p.Stroke();
             }
 
@@ -1344,7 +1346,7 @@ namespace BarGraph.Core
 
                                 // Outline
                                 p.strokeColor = _settings.SelectionRimColor;
-                                p.lineWidth   = 1.5f;
+                                p.lineWidth   = _settings.SelectionRimWidth;
                                 p.BeginPath();
                                 PathRect(p, sx, drawTop, sw, drawH);
                                 p.Stroke();
