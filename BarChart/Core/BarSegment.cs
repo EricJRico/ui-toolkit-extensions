@@ -18,18 +18,28 @@ namespace BarGraph.Core
         /// </summary>
         public readonly Color32 Color;
 
-        public BarSegment(float value, Color32 color)
+        /// <summary>
+        /// User-defined identity tag.  Typically a shared ID representing a
+        /// category that appears across many bars (e.g. an allocation site ID).
+        /// The graph never interprets this value — it carries it through the
+        /// pipeline and returns it in interaction events.
+        /// <para>Default <c>-1</c> means anonymous / no identity.</para>
+        /// </summary>
+        public readonly int Tag;
+
+        public BarSegment(float value, Color32 color, int tag = -1)
         {
             Value = Mathf.Max(0f, value);
             Color = color;
+            Tag   = tag;
         }
 
-        public BarSegment(float value, Color color)
-            : this(value, (Color32)color) { }
+        public BarSegment(float value, Color color, int tag = -1)
+            : this(value, (Color32)color, tag) { }
 
         // Explicit default(Color32) — 'default' alone is ambiguous between
         // the Color32 and Color overloads in older C# language versions.
         public BarSegment(float value)
-            : this(value, default(Color32)) { }
+            : this(value, default(Color32), -1) { }
     }
 }

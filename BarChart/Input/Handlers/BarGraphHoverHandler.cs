@@ -26,7 +26,7 @@ namespace BarGraph.Input.Handlers
             _element = null;
         }
 
-        private void OnHovered(Vector2 pos)  => _element?.InternalSetHover(_element.HitTestBar(pos));
+        private void OnHovered(Vector2 pos)  => _element?.InternalSetHover(_element.HitTestBar(pos), pos);
         private void OnHoverLeft()            => _element?.InternalSetHover(-1);
     }
 }

@@ -109,6 +109,15 @@ namespace BarGraph.Core
         /// <summary>Fired after zoom or pan changes.</summary>
         public event Action<ViewChangedEventArgs>    ViewChanged;
 
+        /// <summary>Fired when a segment is clicked (single-segment inspect).</summary>
+        public event Action<SegmentEventArgs>        SegmentClicked;
+
+        /// <summary>
+        /// Fired when the segment under the cursor changes (or cursor leaves all segments).
+        /// Args have <c>BarDataIndex == -1</c> when no segment is hovered.
+        /// </summary>
+        public event Action<SegmentEventArgs>        SegmentHoverChanged;
+
         // ── Input ─────────────────────────────────────────────────────────────
 
         private readonly BarGraphEventBus       _eventBus = new BarGraphEventBus();
@@ -211,6 +220,9 @@ namespace BarGraph.Core
         //  Public properties
         // ─────────────────────────────────────────────────────────────────────
 
+        /// <summary> Read-only access to the chart model bar count </summary>
+        public int BarCount => _model.BarCount;
+        
         /// <summary>Read-only access to the live view state (for external inspection).</summary>
         public ChartViewState ViewState => _viewState;
 
@@ -425,20 +437,57 @@ namespace BarGraph.Core
         internal float GetPlotHeight() =>
             Mathf.Max(1f, contentRect.height - _settings.PaddingTop  - _settings.PaddingBottom);
 
-        internal int BarCount => _model.BarCount;
-
         // ─────────────────────────────────────────────────────────────────────
         //  Internal state mutators (called by manipulators; each dirty-repaints)
         // ─────────────────────────────────────────────────────────────────────
 
         internal void InternalSetHover(int dataIndex)
         {
-            if (_viewState.HoveredBarIndex == dataIndex) return;
-            _viewState.HoveredBarIndex = dataIndex;
-            float val = (dataIndex >= 0 && dataIndex < _model.BarCount)
-                ? _model.Bars[dataIndex].TotalValue : 0f;
-            HoverChanged?.Invoke(new HoverChangedEventArgs(dataIndex, val));
-            MarkDirtyRepaint();
+            InternalSetHover(dataIndex, new Vector2(-1f, -1f));
+        }
+
+        /// <summary>
+        /// Sets the hovered bar AND resolves the hovered segment from the
+        /// cursor's Y position.  Manipulators that have the local position
+        /// should prefer this overload for segment-level hover feedback.
+        /// </summary>
+        internal void InternalSetHover(int dataIndex, Vector2 localPos)
+        {
+            bool barChanged = _viewState.HoveredBarIndex != dataIndex;
+            if (barChanged)
+            {
+                _viewState.HoveredBarIndex = dataIndex;
+                float val = (dataIndex >= 0 && dataIndex < _model.BarCount)
+                    ? _model.Bars[dataIndex].TotalValue : 0f;
+                HoverChanged?.Invoke(new HoverChangedEventArgs(dataIndex, val));
+            }
+
+            // Resolve segment under cursor
+            var segHit = HitTestSegment(localPos, dataIndex);
+
+            bool segChanged = _viewState.HoveredSegmentBar   != segHit.BarDataIndex
+                           || _viewState.HoveredSegmentIndex != segHit.SegmentIndex;
+
+            _viewState.HoveredSegmentBar   = segHit.BarDataIndex;
+            _viewState.HoveredSegmentIndex = segHit.SegmentIndex;
+
+            if (segChanged)
+            {
+                SegmentHoverChanged?.Invoke(new SegmentEventArgs
+                {
+                    BarDataIndex    = segHit.BarDataIndex,
+                    BarDisplayIndex = segHit.BarDataIndex >= 0 && segHit.BarDataIndex < _viewState.DataToDisplay.Length
+                                       ? _viewState.DataToDisplay[segHit.BarDataIndex] : -1,
+                    SegmentIndex    = segHit.SegmentIndex,
+                    Tag             = segHit.Tag,
+                    Value           = segHit.Value,
+                    Color           = segHit.Color,
+                    LocalPosition   = localPos,
+                });
+            }
+
+            if (barChanged || segChanged)
+                MarkDirtyRepaint();
         }
 
         /// <summary>
@@ -499,6 +548,30 @@ namespace BarGraph.Core
                 using var uiEvt = BarClickedUIEvent.GetPooled(dataIndex, val);
                 uiEvt.target = this;
                 SendEvent(uiEvt);
+
+                // Fire segment click if hover has resolved a segment in this bar.
+                // Hover is updated every mouse move, so by click time it's current.
+                if (_viewState.HoveredSegmentBar == dataIndex
+                    && _viewState.HoveredSegmentIndex >= 0)
+                {
+                    ref readonly BarEntry bar = ref _model.Bars[dataIndex];
+                    int si = _viewState.HoveredSegmentIndex;
+                    if (si < bar.SegmentCount)
+                    {
+                        ref readonly BarSegment seg = ref _model.Segments[bar.SegmentStart + si];
+
+                        SegmentClicked?.Invoke(new SegmentEventArgs
+                        {
+                            BarDataIndex    = dataIndex,
+                            BarDisplayIndex = displayIdx,
+                            SegmentIndex    = si,
+                            Tag             = seg.Tag,
+                            Value           = seg.Value,
+                            Color           = seg.Color,
+                            LocalPosition   = Vector2.zero,
+                        });
+                    }
+                }
             }
         }
 
@@ -567,6 +640,68 @@ namespace BarGraph.Core
             EnsureSortMap();
             return displayIdx < _viewState.DisplayToData.Length
                 ? _viewState.DisplayToData[displayIdx] : displayIdx;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        //  Segment hit-testing
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Resolves which segment the cursor is over within a bar.
+        /// Walks the bar's segment stack using the same Y math as
+        /// <see cref="DrawDirectBars"/>.  Returns <see cref="SegmentHitResult.Miss"/>
+        /// when in LOD mode (stride &lt; 1px), when the bar is missed, or when
+        /// the cursor is in a gap between segments.
+        /// <para>O(segments_per_bar) — only called on mouse events, not per-frame.</para>
+        /// </summary>
+        internal SegmentHitResult HitTestSegment(Vector2 localPos, int barDataIndex = -2)
+        {
+            if (_model.BarCount == 0) return SegmentHitResult.Miss;
+
+            // Resolve bar if not provided (-2 = not supplied, -1 = known miss)
+            if (barDataIndex == -2)
+                barDataIndex = HitTestBar(localPos);
+            if (barDataIndex < 0 || barDataIndex >= _model.BarCount)
+                return SegmentHitResult.Miss;
+
+            // No segment interaction in LOD mode
+            float stride = GetBarStride();
+            if (stride < 1f) return SegmentHitResult.Miss;
+
+            float plotY2 = contentRect.height - _settings.PaddingBottom;
+            float plotH  = GetPlotHeight();
+            float yScale = plotH / _effectiveMaxY * _viewState.ZoomY;
+            float yOffset = _viewState.PanY * plotH;
+
+            ref readonly BarEntry bar = ref _model.Bars[barDataIndex];
+            float yBottom = plotY2 + yOffset;
+
+            for (int s = 0; s < bar.SegmentCount; s++)
+            {
+                ref readonly BarSegment seg = ref _model.Segments[bar.SegmentStart + s];
+                float segH = seg.Value * yScale;
+
+                // Skip sub-pixel segments (they're LOD-merged in rendering,
+                // so clicking them would be misleading)
+                if (segH < 1f) { yBottom -= segH; continue; }
+
+                float yTop = yBottom - segH;
+
+                if (localPos.y >= yTop && localPos.y <= yBottom)
+                {
+                    return new SegmentHitResult
+                    {
+                        BarDataIndex  = barDataIndex,
+                        SegmentIndex  = s,
+                        Tag           = seg.Tag,
+                        Value         = seg.Value,
+                        Color         = seg.Color,
+                    };
+                }
+                yBottom = yTop;
+            }
+
+            return SegmentHitResult.Miss;
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1170,6 +1305,56 @@ namespace BarGraph.Core
                 PathRect(p, hx, plotY2 - plotH, hw, plotH);
                 p.Fill();
             }
+
+            // ── Hovered segment highlight — single segment rect + outline ────────
+            int segBar = _viewState.HoveredSegmentBar;
+            int segIdx = _viewState.HoveredSegmentIndex;
+            if (!lodMode && segBar >= 0 && segBar < _model.BarCount && segIdx >= 0)
+            {
+                ref readonly BarEntry bar = ref _model.Bars[segBar];
+                if (segIdx < bar.SegmentCount)
+                {
+                    int displayIdx = segBar < _viewState.DataToDisplay.Length
+                        ? _viewState.DataToDisplay[segBar] : segBar;
+                    SnapBarX(displayIdx, plotX, stride, barW, out float sx, out float sw);
+
+                    // Walk segments to find this segment's Y position
+                    // (same math as DrawDirectBars / HitTestSegment)
+                    float yScale  = plotH / _effectiveMaxY * _viewState.ZoomY;
+                    float yOffset = _viewState.PanY * plotH;
+                    float yBottom = plotY2 + yOffset;
+
+                    for (int s = 0; s <= segIdx; s++)
+                    {
+                        ref readonly BarSegment seg = ref _model.Segments[bar.SegmentStart + s];
+                        float segH = seg.Value * yScale;
+                        if (s == segIdx)
+                        {
+                            float yTop    = yBottom - segH;
+                            float drawTop = Mathf.Max(yTop, plotY2 - plotH);
+                            float drawBot = Mathf.Min(yBottom, plotY2);
+                            float drawH   = drawBot - drawTop;
+                            if (drawH >= 0.5f)
+                            {
+                                // Tint fill
+                                p.fillColor = _settings.HoverTintColor;
+                                p.BeginPath();
+                                PathRect(p, sx, drawTop, sw, drawH);
+                                p.Fill();
+
+                                // Outline
+                                p.strokeColor = _settings.SelectionRimColor;
+                                p.lineWidth   = 1.5f;
+                                p.BeginPath();
+                                PathRect(p, sx, drawTop, sw, drawH);
+                                p.Stroke();
+                            }
+                            break;
+                        }
+                        yBottom -= segH;
+                    }
+                }
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -1515,6 +1700,8 @@ namespace BarGraph.Core
         {
             RecalcBounds();
             _viewState.SortDirty = true;
+            _viewState.HoveredSegmentBar   = -1;
+            _viewState.HoveredSegmentIndex = -1;
             EnsureLabelPool();
             MarkDirtyRepaint();
         }
@@ -1712,5 +1899,68 @@ namespace BarGraph.Core
             public float   X, Y, W, H;
             public Color32 Color;
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    //  Segment interaction types
+    // ─────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Result of a segment hit-test.  Returned by
+    /// <see cref="BarGraphElement.HitTestSegment"/>.
+    /// </summary>
+    public struct SegmentHitResult
+    {
+        /// <summary>Data index of the bar containing the hit segment, or -1.</summary>
+        public int     BarDataIndex;
+
+        /// <summary>Index within the bar's segment array, or -1.</summary>
+        public int     SegmentIndex;
+
+        /// <summary>User-defined tag from <see cref="BarSegment.Tag"/>, or -1.</summary>
+        public int     Tag;
+
+        /// <summary>Segment value (magnitude).</summary>
+        public float   Value;
+
+        /// <summary>Segment fill colour.</summary>
+        public Color32 Color;
+
+        /// <summary>True when the hit-test resolved to a valid segment.</summary>
+        public bool IsHit => BarDataIndex >= 0 && SegmentIndex >= 0;
+
+        /// <summary>Sentinel for no-hit / miss results.</summary>
+        public static readonly SegmentHitResult Miss = new SegmentHitResult
+        {
+            BarDataIndex = -1, SegmentIndex = -1, Tag = -1
+        };
+    }
+
+    /// <summary>
+    /// Event args for <see cref="BarGraphElement.SegmentClicked"/> and
+    /// <see cref="BarGraphElement.SegmentHoverChanged"/> events.
+    /// </summary>
+    public struct SegmentEventArgs
+    {
+        /// <summary>Data index of the bar containing the segment.</summary>
+        public int     BarDataIndex;
+
+        /// <summary>Display index of the bar (after sort mapping).</summary>
+        public int     BarDisplayIndex;
+
+        /// <summary>Index within the bar's segment array.</summary>
+        public int     SegmentIndex;
+
+        /// <summary>User-defined tag from <see cref="BarSegment.Tag"/>. -1 if anonymous.</summary>
+        public int     Tag;
+
+        /// <summary>Segment value (magnitude).</summary>
+        public float   Value;
+
+        /// <summary>Segment fill colour.</summary>
+        public Color32 Color;
+
+        /// <summary>Cursor position in element-local coordinates at time of event.</summary>
+        public Vector2 LocalPosition;
     }
 }

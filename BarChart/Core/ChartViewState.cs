@@ -49,6 +49,12 @@ namespace BarGraph.Core
         /// <summary>Data index of the bar currently under the cursor, or -1.</summary>
         public int HoveredBarIndex = -1;
 
+        /// <summary>Data index of the bar containing the hovered segment, or -1.</summary>
+        public int HoveredSegmentBar = -1;
+
+        /// <summary>Segment index within the hovered bar's segment array, or -1.</summary>
+        public int HoveredSegmentIndex = -1;
+
         /// <summary>Data index of the keyboard-focused bar, or -1.</summary>
         public int FocusedBarIndex = -1;
 
