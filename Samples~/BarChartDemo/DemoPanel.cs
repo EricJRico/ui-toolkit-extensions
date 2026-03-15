@@ -276,6 +276,11 @@ namespace BarGraph.Demo
             }));
         }
 
+        protected void AddScrollbars()
+        {
+            Graph.AddHandler(new BarGraphScrollbarHandler());
+        }
+
         protected void AddResetViewButton()
         {
             AddControl(MakeButton("Reset View", () => Graph.ResetView()));

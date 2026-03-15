@@ -26,6 +26,7 @@ namespace BarGraph.Demo
             AddSortToggle();
             AddOverlayToggle();
             AddZoomYToggle();
+            AddScrollbars();
             AddResetViewButton();
 
             Regenerate();

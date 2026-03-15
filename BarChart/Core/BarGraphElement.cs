@@ -425,6 +425,8 @@ namespace BarGraph.Core
         internal float GetPlotHeight() =>
             Mathf.Max(1f, contentRect.height - _settings.PaddingTop  - _settings.PaddingBottom);
 
+        internal int BarCount => _model.BarCount;
+
         // ─────────────────────────────────────────────────────────────────────
         //  Internal state mutators (called by manipulators; each dirty-repaints)
         // ─────────────────────────────────────────────────────────────────────
