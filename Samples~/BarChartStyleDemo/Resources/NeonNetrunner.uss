@@ -1,0 +1,35 @@
+/* NeonNetrunner.uss — Cyberpunk synthwave hacking terminal
+   Neon cyan/magenta on void-black. Ultra-tight, dense bars.  */
+
+.bar-graph--neon-netrunner {
+    /* ── Chrome colours ──────────────────────────────────────────────── */
+    --bar-graph-bg-color:                rgb(5, 2, 15);
+    --bar-graph-default-bar-color:       rgb(0, 255, 210);
+    --bar-graph-axis-color:              rgb(90, 30, 90);
+    --bar-graph-grid-line-color:         rgb(20, 8, 35);
+    --bar-graph-hover-tint-color:        rgba(255, 0, 180, 0.22);
+    --bar-graph-selection-fill-color:    rgba(255, 0, 150, 0.25);
+    --bar-graph-selection-rim-color:     rgba(255, 0, 200, 0.95);
+    --bar-graph-focus-rim-color:         rgb(0, 255, 210);
+    --bar-graph-drag-rect-fill-color:    rgba(0, 255, 210, 0.06);
+    --bar-graph-drag-rect-border-color:  rgba(0, 255, 210, 0.5);
+    --bar-graph-overlay-tint:            rgba(0, 255, 210, 0.35);
+
+    /* ── Chrome geometry ─────────────────────────────────────────────── */
+    --bar-graph-bar-spacing-ratio:       0.04;
+    --bar-graph-grid-line-width:         0.5;
+    --bar-graph-axis-line-width:         1;
+    --bar-graph-selection-rim-width:     1;
+    --bar-graph-padding-top:             8;
+    --bar-graph-padding-bottom:          28;
+}
+
+/* ── Label typography ────────────────────────────────────────────────── */
+.bar-graph--neon-netrunner .bar-graph__label--y,
+.bar-graph--neon-netrunner .bar-graph__label--x {
+    color: rgb(100, 220, 200);
+    font-size: 9px;
+    -unity-font-style: italic;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}

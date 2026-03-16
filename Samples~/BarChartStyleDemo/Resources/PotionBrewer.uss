@@ -1,0 +1,34 @@
+/* PotionBrewer.uss — Fantasy alchemist's tome
+   Warm parchment browns, gold accents, chunky generous spacing.  */
+
+.bar-graph--potion-brewer {
+    /* ── Chrome colours ──────────────────────────────────────────────── */
+    --bar-graph-bg-color:                rgb(28, 20, 12);
+    --bar-graph-default-bar-color:       rgb(200, 160, 40);
+    --bar-graph-axis-color:              rgb(120, 90, 50);
+    --bar-graph-grid-line-color:         rgb(42, 30, 18);
+    --bar-graph-hover-tint-color:        rgba(255, 200, 60, 0.18);
+    --bar-graph-selection-fill-color:    rgba(218, 175, 50, 0.22);
+    --bar-graph-selection-rim-color:     rgba(255, 215, 0, 0.9);
+    --bar-graph-focus-rim-color:         rgb(255, 170, 40);
+    --bar-graph-drag-rect-fill-color:    rgba(255, 215, 0, 0.06);
+    --bar-graph-drag-rect-border-color:  rgba(255, 215, 0, 0.5);
+    --bar-graph-overlay-tint:            rgba(255, 215, 0, 0.35);
+
+    /* ── Chrome geometry ─────────────────────────────────────────────── */
+    --bar-graph-bar-spacing-ratio:       0.25;
+    --bar-graph-grid-line-width:         1;
+    --bar-graph-axis-line-width:         2;
+    --bar-graph-selection-rim-width:     2;
+    --bar-graph-padding-left:            64;
+    --bar-graph-padding-bottom:          48;
+    --bar-graph-x-label-width:           70;
+}
+
+/* ── Label typography ────────────────────────────────────────────────── */
+.bar-graph--potion-brewer .bar-graph__label--y,
+.bar-graph--potion-brewer .bar-graph__label--x {
+    color: rgb(230, 210, 170);
+    font-size: 12px;
+    -unity-font-style: bold;
+}

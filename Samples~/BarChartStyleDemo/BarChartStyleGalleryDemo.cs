@@ -93,11 +93,12 @@ namespace BarGraph.StyleDemo
             };
             scroll.Add(grid);
 
-            // Create panels
-            _panels.Add(new DamageMeterPanel());
-            _panels.Add(new ResourceEconomyPanel());
-            _panels.Add(new PerformanceProfilerPanel());
-            _panels.Add(new LeaderboardPanel());
+            // Create panels — order matters for flex-wrap layout rhythm:
+            // Row 1: wide+short, Row 2: narrow+tall | square, Row 3: wide+medium
+            _panels.Add(new NeonNetrunnerPanel());
+            _panels.Add(new PotionBrewerPanel());
+            _panels.Add(new ArcadeScoresPanel());
+            _panels.Add(new ShipSystemsHudPanel());
 
             foreach (var panel in _panels)
             {

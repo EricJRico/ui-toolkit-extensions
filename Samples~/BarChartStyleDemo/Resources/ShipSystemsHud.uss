@@ -1,0 +1,33 @@
+/* ShipSystemsHud.uss — Military cockpit HUD
+   Amber/green monochrome. Thin precise lines, wide tracking.  */
+
+.bar-graph--ship-systems-hud {
+    /* ── Chrome colours ──────────────────────────────────────────────── */
+    --bar-graph-bg-color:                rgb(4, 10, 6);
+    --bar-graph-default-bar-color:       rgb(255, 170, 0);
+    --bar-graph-axis-color:              rgb(35, 80, 45);
+    --bar-graph-grid-line-color:         rgb(12, 28, 16);
+    --bar-graph-hover-tint-color:        rgba(0, 230, 100, 0.15);
+    --bar-graph-selection-fill-color:    rgba(0, 255, 120, 0.18);
+    --bar-graph-selection-rim-color:     rgba(255, 170, 0, 0.9);
+    --bar-graph-focus-rim-color:         rgb(255, 200, 50);
+    --bar-graph-drag-rect-fill-color:    rgba(255, 170, 0, 0.06);
+    --bar-graph-drag-rect-border-color:  rgba(255, 170, 0, 0.5);
+    --bar-graph-overlay-tint:            rgba(255, 170, 0, 0.35);
+
+    /* ── Chrome geometry ─────────────────────────────────────────────── */
+    --bar-graph-bar-spacing-ratio:       0.10;
+    --bar-graph-grid-line-width:         0.5;
+    --bar-graph-axis-line-width:         1;
+    --bar-graph-selection-rim-width:     1.5;
+    --bar-graph-padding-left:            60;
+}
+
+/* ── Label typography ────────────────────────────────────────────────── */
+.bar-graph--ship-systems-hud .bar-graph__label--y,
+.bar-graph--ship-systems-hud .bar-graph__label--x {
+    color: rgb(200, 150, 40);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}

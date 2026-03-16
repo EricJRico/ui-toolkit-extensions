@@ -1,0 +1,33 @@
+/* ArcadeScores.uss — Retro CRT arcade cabinet
+   Bold primaries on deep navy. Chunky, blocky, nostalgic.  */
+
+.bar-graph--arcade-scores {
+    /* ── Chrome colours ──────────────────────────────────────────────── */
+    --bar-graph-bg-color:                rgb(8, 8, 24);
+    --bar-graph-default-bar-color:       rgb(50, 255, 50);
+    --bar-graph-axis-color:              rgb(200, 200, 210);
+    --bar-graph-grid-line-color:         rgb(18, 18, 50);
+    --bar-graph-hover-tint-color:        rgba(255, 255, 255, 0.25);
+    --bar-graph-selection-fill-color:    rgba(255, 255, 0, 0.25);
+    --bar-graph-selection-rim-color:     rgba(255, 50, 50, 0.95);
+    --bar-graph-focus-rim-color:         rgb(255, 255, 0);
+    --bar-graph-drag-rect-fill-color:    rgba(255, 255, 0, 0.08);
+    --bar-graph-drag-rect-border-color:  rgba(255, 255, 0, 0.6);
+    --bar-graph-overlay-tint:            rgba(50, 255, 50, 0.35);
+
+    /* ── Chrome geometry ─────────────────────────────────────────────── */
+    --bar-graph-bar-spacing-ratio:       0.22;
+    --bar-graph-grid-line-width:         1.5;
+    --bar-graph-axis-line-width:         2;
+    --bar-graph-selection-rim-width:     2;
+    --bar-graph-min-bar-width:           3;
+}
+
+/* ── Label typography ────────────────────────────────────────────────── */
+.bar-graph--arcade-scores .bar-graph__label--y,
+.bar-graph--arcade-scores .bar-graph__label--x {
+    color: rgb(50, 255, 50);
+    font-size: 11px;
+    -unity-font-style: bold;
+    text-transform: uppercase;
+}
