@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -7,8 +6,9 @@ using BarGraph.Events;
 namespace BarGraph.Core
 {
     /// <summary>
-    /// Passive overview strip that shows the full dataset at zoom-1 with a viewport
+    /// Overview strip that shows the full dataset at zoom-1 with a viewport
     /// indicator rectangle reflecting the bound chart's current zoom/pan position.
+    /// Drag the indicator to pan; drag its left/right edges to resize the viewport.
     ///
     /// Usage
     /// ─────
@@ -32,6 +32,8 @@ namespace BarGraph.Core
         public const string UssClassName        = "bar-graph-overview-strip";
         public const string InnerChartClassName = "bar-graph--overview";
         public const string IndicatorClassName  = "bar-graph-overview-strip__indicator";
+        public const string HandleClassName     = "bar-graph-overview-strip__handle";
+        public const string ResizingClassName   = "bar-graph-overview-strip__indicator--resizing";
 
         // ── Custom style properties ──────────────────────────────────────────
         static readonly CustomStyleProperty<Color> s_indicatorFillColor
@@ -49,12 +51,27 @@ namespace BarGraph.Core
         // ── Children ─────────────────────────────────────────────────────────
         private readonly BarGraphElement _innerChart;
         private readonly VisualElement   _indicator;
+        private readonly VisualElement   _handleLeft;
+        private readonly VisualElement   _handleRight;
 
         // ── Bound source ─────────────────────────────────────────────────────
         private BarGraphElement _source;
 
         // ── Shared default stylesheet ────────────────────────────────────────
         private static StyleSheet s_defaultSheet;
+
+        // ── Drag state ───────────────────────────────────────────────────────
+        private enum DragMode { None, Pan, ResizeLeft, ResizeRight }
+
+        const float EdgeGrabWidth = 5f;
+
+        private DragMode _dragMode;
+        private float    _dragStartPointerX;
+        private float    _dragStartPanX;
+        private float    _dragStartZoomX;
+        private float    _dragStartIndicatorL; // indicator left at drag start (px)
+        private float    _dragStartIndicatorW; // indicator width at drag start (px)
+        private int      _pointerId = -1;
 
         // ─────────────────────────────────────────────────────────────────────
         //  Construction
@@ -71,7 +88,7 @@ namespace BarGraph.Core
 
             style.overflow = Overflow.Hidden;
             style.flexShrink = 0;
-            pickingMode = PickingMode.Ignore;
+            pickingMode = PickingMode.Position;
 
             // ── Inner chart: full dataset, no chrome ─────────────────────────
             _innerChart = new BarGraphElement();
@@ -103,17 +120,35 @@ namespace BarGraph.Core
             _indicator.style.position = Position.Absolute;
             _indicator.style.top    = 0;
             _indicator.style.bottom = 0;
-            _indicator.pickingMode  = PickingMode.Ignore;
+            _indicator.pickingMode  = PickingMode.Position;
             _indicator.style.display = DisplayStyle.None;
             ApplyIndicatorStyle();
+
+            // Edge handles
+            _handleLeft = MakeHandle();
+            _handleLeft.style.left = 0;
+            _indicator.Add(_handleLeft);
+
+            _handleRight = MakeHandle();
+            _handleRight.style.right = 0;
+            _indicator.Add(_handleRight);
+
             Add(_indicator);
 
+            // ── Events ───────────────────────────────────────────────────────
             RegisterCallback<CustomStyleResolvedEvent>(_ => ResolveCustomStyles());
             RegisterCallback<GeometryChangedEvent>(_ =>
             {
                 if (_source != null)
                     SyncIndicator(_source.ViewState.ZoomX, _source.ViewState.PanX);
             });
+
+            _indicator.RegisterCallback<PointerDownEvent>(OnPointerDown);
+            _handleLeft.RegisterCallback<PointerDownEvent>(OnPointerDown);
+            _handleRight.RegisterCallback<PointerDownEvent>(OnPointerDown);
+            _indicator.RegisterCallback<PointerMoveEvent>(OnPointerMove);
+            _indicator.RegisterCallback<PointerUpEvent>(OnPointerUp);
+            _indicator.RegisterCallback<PointerCaptureOutEvent>(_ => EndDrag());
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -195,6 +230,127 @@ namespace BarGraph.Core
 
             _indicator.style.width = indicatorW;
             _indicator.style.left  = indicatorL;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        //  Drag interaction
+        // ─────────────────────────────────────────────────────────────────────
+
+        private void OnPointerDown(PointerDownEvent evt)
+        {
+            if (_source == null || evt.button != 0) return;
+
+            evt.StopPropagation();
+            _pointerId = evt.pointerId;
+            _indicator.CapturePointer(_pointerId);
+
+            _dragStartPointerX  = evt.position.x;
+            _dragStartPanX      = _source.ViewState.PanX;
+            _dragStartZoomX     = _source.ViewState.ZoomX;
+            _dragStartIndicatorL = _indicator.resolvedStyle.left;
+            _dragStartIndicatorW = _indicator.resolvedStyle.width;
+
+            // Determine drag mode from pointer position relative to indicator bounds
+            float indicLeft = _indicator.worldBound.x;
+            float indicW    = _indicator.worldBound.width;
+            float pointerX  = evt.position.x;
+
+            if (pointerX <= indicLeft + EdgeGrabWidth)
+                _dragMode = DragMode.ResizeLeft;
+            else if (pointerX >= indicLeft + indicW - EdgeGrabWidth)
+                _dragMode = DragMode.ResizeRight;
+            else
+                _dragMode = DragMode.Pan;
+
+            if (_dragMode == DragMode.ResizeLeft || _dragMode == DragMode.ResizeRight)
+                _indicator.AddToClassList(ResizingClassName);
+        }
+
+        private void OnPointerMove(PointerMoveEvent evt)
+        {
+            if (_dragMode == DragMode.None || _source == null) return;
+            if (!_indicator.HasPointerCapture(_pointerId)) return;
+
+            float dx   = evt.position.x - _dragStartPointerX;
+            float padL = _innerChart.VisPaddingLeft;
+            float padR = _innerChart.VisPaddingRight;
+            float plotW = _innerChart.contentRect.width - padL - padR;
+            if (plotW < 1f) return;
+
+            int totalBars = _innerChart.BarCount;
+            if (totalBars <= 0) return;
+
+            float curZoomY = _source.ViewState.ZoomY;
+            float curPanY  = _source.ViewState.PanY;
+
+            switch (_dragMode)
+            {
+                case DragMode.Pan:
+                {
+                    // Convert pixel delta to pan delta
+                    float panDelta = dx / plotW * totalBars;
+                    _source.InternalSetPan(_dragStartPanX + panDelta, curPanY);
+                    break;
+                }
+
+                case DragMode.ResizeLeft:
+                {
+                    // Left edge moves by dx; right edge stays fixed
+                    float newL = Mathf.Clamp(_dragStartIndicatorL + dx, padL,
+                        _dragStartIndicatorL + _dragStartIndicatorW - EdgeGrabWidth * 2f);
+                    float newW = (_dragStartIndicatorL + _dragStartIndicatorW) - newL;
+                    float newZoomX = plotW / Mathf.Max(1f, newW);
+                    float maxPanX  = totalBars * (1f - 1f / newZoomX);
+                    float scrollable = plotW - newW;
+                    float newPanX  = scrollable > 0f ? (newL - padL) / scrollable * maxPanX : 0f;
+                    _source.InternalSetZoom(newZoomX, curZoomY, newPanX, curPanY);
+                    break;
+                }
+
+                case DragMode.ResizeRight:
+                {
+                    // Right edge moves by dx; left edge stays fixed
+                    float newW = Mathf.Clamp(_dragStartIndicatorW + dx, EdgeGrabWidth * 2f, plotW);
+                    float newZoomX = plotW / Mathf.Max(1f, newW);
+                    float maxPanX  = totalBars * (1f - 1f / newZoomX);
+                    float scrollable = plotW - newW;
+                    float newPanX  = scrollable > 0f
+                        ? (_dragStartIndicatorL - padL) / scrollable * maxPanX : 0f;
+                    _source.InternalSetZoom(newZoomX, curZoomY, newPanX, curPanY);
+                    break;
+                }
+            }
+        }
+
+        private void OnPointerUp(PointerUpEvent evt)
+        {
+            if (_dragMode == DragMode.None) return;
+            if (evt.pointerId != _pointerId) return;
+            EndDrag();
+        }
+
+        private void EndDrag()
+        {
+            if (_pointerId >= 0 && _indicator.HasPointerCapture(_pointerId))
+                _indicator.ReleasePointer(_pointerId);
+            _dragMode  = DragMode.None;
+            _pointerId = -1;
+            _indicator.RemoveFromClassList(ResizingClassName);
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        //  Handle factory
+        // ─────────────────────────────────────────────────────────────────────
+
+        private static VisualElement MakeHandle()
+        {
+            var h = new VisualElement();
+            h.AddToClassList(HandleClassName);
+            h.style.position = Position.Absolute;
+            h.style.top    = 0;
+            h.style.bottom = 0;
+            h.pickingMode  = PickingMode.Position;
+            return h;
         }
 
         // ─────────────────────────────────────────────────────────────────────

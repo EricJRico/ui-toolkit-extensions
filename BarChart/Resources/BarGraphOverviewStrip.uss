@@ -24,4 +24,25 @@
 
 .bar-graph-overview-strip__indicator {
     border-radius: 2px;
+    cursor: pan;
+}
+
+.bar-graph-overview-strip__indicator--resizing {
+    cursor: resize-horizontal;
+}
+
+/* ── Edge handles ────────────────────────────────────────────────────
+   Thin vertical grips on left/right edges of the viewport indicator. */
+
+.bar-graph-overview-strip__handle {
+    width: 4px;
+    background-color: rgba(255, 255, 255, 0.35);
+    border-radius: 1px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    cursor: resize-horizontal;
+}
+
+.bar-graph-overview-strip__handle:hover {
+    background-color: rgba(255, 255, 255, 0.6);
 }

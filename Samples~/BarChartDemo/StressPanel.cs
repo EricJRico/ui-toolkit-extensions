@@ -12,7 +12,7 @@ namespace BarGraph.Demo
     public sealed class StressPanel : DemoPanel
     {
         private int _barCount = 10000;
-        private readonly BarGraphOverviewStrip _overview;
+        private BarGraphOverviewStrip _overview;
 
         public StressPanel() : base("Stress Test") { }
 
