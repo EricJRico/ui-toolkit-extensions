@@ -1,0 +1,27 @@
+/* BarGraphOverviewStrip.uss  –  Default theme for BarGraphOverviewStrip
+   Miniature full-dataset view with viewport indicator.
+   Override custom properties per-theme as needed.                     */
+
+.bar-graph-overview-strip {
+    height: 48px;
+    min-height: 24px;
+    max-height: 80px;
+    overflow: hidden;
+
+    --overview-indicator-fill-color:    rgba(255, 255, 255, 0.12);
+    --overview-indicator-border-color:  rgba(102, 179, 255, 0.7);
+    --overview-indicator-border-width:  1.5;
+}
+
+/* Inner chart: zero padding so bars fill the entire strip */
+.bar-graph--overview {
+    --bar-graph-padding-left:          0;
+    --bar-graph-padding-right:         0;
+    --bar-graph-padding-top:           2;
+    --bar-graph-padding-bottom:        2;
+    --bar-graph-bar-spacing-ratio:     0.04;
+}
+
+.bar-graph-overview-strip__indicator {
+    border-radius: 2px;
+}

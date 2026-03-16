@@ -12,11 +12,16 @@ namespace BarGraph.Demo
     public sealed class StressPanel : DemoPanel
     {
         private int _barCount = 10000;
+        private readonly BarGraphOverviewStrip _overview;
 
         public StressPanel() : base("Stress Test") { }
 
         protected override void BuildControls()
         {
+            _overview = new BarGraphOverviewStrip();
+            _overview.BindTo(Graph);
+            Card.Insert(1, _overview);   // between title and graph
+
             AddControl(MakeSliderInt("Bars", 100, 100000, _barCount, v =>
             {
                 _barCount = v;
@@ -61,6 +66,7 @@ namespace BarGraph.Demo
             }
 
             Graph.SetData(bars, _barCount, segments, _barCount);
+            _overview.SetData(bars, _barCount, segments, _barCount);
         }
     }
 }
