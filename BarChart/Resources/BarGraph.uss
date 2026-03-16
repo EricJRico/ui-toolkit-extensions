@@ -29,6 +29,7 @@
     --bar-graph-min-bar-width:           1;
     --bar-graph-grid-line-width:         1;
     --bar-graph-axis-line-width:         1.5;
+    --bar-graph-dim-opacity:             1;
 
     /* ── Padding (plot-area insets) ────────────────────────────────── */
     --bar-graph-padding-left:            52;

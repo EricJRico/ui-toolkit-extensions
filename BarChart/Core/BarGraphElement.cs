@@ -71,6 +71,7 @@ namespace BarGraph.Core
         static readonly CustomStyleProperty<float> k_XLabelWidth          = new("--bar-graph-x-label-width");
         static readonly CustomStyleProperty<float> k_XLabelOffsetY        = new("--bar-graph-x-label-offset-y");
         static readonly CustomStyleProperty<float> k_YLabelGap            = new("--bar-graph-y-label-gap");
+        static readonly CustomStyleProperty<float> k_DimOpacity           = new("--bar-graph-dim-opacity");
 
         // ─────────────────────────────────────────────────────────────────────
         //  Resolved visual cache  (populated from USS, read by draw methods)
@@ -102,6 +103,7 @@ namespace BarGraph.Core
             public float LabelHeight;
             public float XLabelWidth, XLabelOffsetY;
             public float YLabelGap;
+            public float DimOpacity;
         }
 
         private ResolvedVisuals _vis = new ResolvedVisuals
@@ -133,6 +135,7 @@ namespace BarGraph.Core
             PaddingTop         = 12f,
             PaddingBottom      = 32f,
             LabelHeight        = 18f,
+            DimOpacity         = 1f,
             XLabelWidth        = 40f,
             XLabelOffsetY      = 3f,
             YLabelGap          = 4f,
@@ -308,6 +311,7 @@ namespace BarGraph.Core
             if (cs.TryGetValue(k_XLabelWidth,          out f))    _vis.XLabelWidth           = f;
             if (cs.TryGetValue(k_XLabelOffsetY,        out f))    _vis.XLabelOffsetY         = f;
             if (cs.TryGetValue(k_YLabelGap,            out f))    _vis.YLabelGap             = f;
+            if (cs.TryGetValue(k_DimOpacity,           out f))    _vis.DimOpacity            = f;
 
             RebuildLabelPool();
             MarkDirtyRepaint();
@@ -1174,6 +1178,9 @@ namespace BarGraph.Core
             float yOffset = _viewState.PanY * plotH;
             float plotTop = plotY2 - plotH;   // top edge of plot area
 
+            bool hasSel  = _viewState.SelectedBars.Count > 0;
+            float dimAlpha = _vis.DimOpacity;
+
             for (int dispIdx = startDisp; dispIdx < endDisp; dispIdx++)
             {
                 int dataIdx = _viewState.DisplayToData[dispIdx];
@@ -1182,6 +1189,10 @@ namespace BarGraph.Core
                 ref readonly BarEntry bar = ref bars[dataIdx];
                 SnapBarX(dispIdx, plotX, stride, barW, out float x, out float bw);
                 float yBottom = plotY2 + yOffset;   // +yOffset shifts range up when panned
+
+                float barAlpha = alpha;
+                if (hasSel && !_viewState.SelectedBars.Contains(dataIdx))
+                    barAlpha *= dimAlpha;
 
                 // ── Segment-level LOD merge state (zero allocation) ─────────
                 // When consecutive segments are each < 1 px tall, accumulate
@@ -1205,7 +1216,7 @@ namespace BarGraph.Core
                     if (segH < 1f)
                     {
                         // Sub-pixel segment → accumulate into merge buffer.
-                        Color32 c = ResolveSegmentColor(seg.Color, alpha);
+                        Color32 c = ResolveSegmentColor(seg.Color, barAlpha);
                         if (seg.Value > mergeDomVal)
                         {
                             mergeDomVal = seg.Value;
@@ -1262,7 +1273,7 @@ namespace BarGraph.Core
                     float sDrawH   = Mathf.Min(yBottom, plotY2) - sDrawTop;
                     if (sDrawH < 0.5f) { yBottom = yTop; continue; }
 
-                    Color32 sc = ResolveSegmentColor(seg.Color, alpha);
+                    Color32 sc = ResolveSegmentColor(seg.Color, barAlpha);
                     AddQuad(sc, x, sDrawTop, bw, sDrawH);
                     yBottom = yTop;
                 }
@@ -1304,6 +1315,9 @@ namespace BarGraph.Core
             BarSegment[] segments = model.Segments;
             int          barCount = model.BarCount;
 
+            bool hasSel  = _viewState.SelectedBars.Count > 0;
+            float dimAlpha = _vis.DimOpacity;
+
             for (int i = 0; i < viewCount; i++)
             {
                 int dataIdx = _viewState.DisplayToData[startDisp + i];
@@ -1314,13 +1328,17 @@ namespace BarGraph.Core
                     Mathf.FloorToInt((float)i / viewCount * pixelCount),
                     0, pixelCount - 1);
 
+                float barAlpha = alpha;
+                if (hasSel && !_viewState.SelectedBars.Contains(dataIdx))
+                    barAlpha *= dimAlpha;
+
                 // For LOD we just use the first segment colour at total value
                 float total = bar.TotalValue;
                 if (total > _lodBuf[px].MaxValue)
                 {
                     Color32 c = bar.SegmentCount > 0
-                        ? ResolveSegmentColor(segments[bar.SegmentStart].Color, alpha)
-                        : ResolveSegmentColor(default, alpha);
+                        ? ResolveSegmentColor(segments[bar.SegmentStart].Color, barAlpha)
+                        : ResolveSegmentColor(default, barAlpha);
                     _lodBuf[px] = new LodPixel { MaxValue = total, Color = c };
                 }
             }

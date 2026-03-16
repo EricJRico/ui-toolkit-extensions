@@ -4,3 +4,7 @@
 .bar-graph--controls-demo {
     --bar-graph-bar-spacing-ratio: 0.12;
 }
+
+.bar-graph--dim-selection {
+    --bar-graph-dim-opacity: 0.3;
+}

@@ -18,6 +18,7 @@ namespace BarGraph.ControlsDemo
 
         protected override void SetupHandlers()
         {
+            Graph.AddToClassList("bar-graph--dim-selection");
             Graph.AddHandler(new BarGraphHoverHandler());
             Graph.AddHandler(new BarGraphSelectionHandler());
         }
