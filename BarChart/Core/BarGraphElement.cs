@@ -49,6 +49,7 @@ namespace BarGraph.Core
         static readonly CustomStyleProperty<Color> k_HoverTintColor       = new("--bar-graph-hover-tint-color");
         static readonly CustomStyleProperty<Color> k_SelectionFillColor   = new("--bar-graph-selection-fill-color");
         static readonly CustomStyleProperty<Color> k_SelectionRimColor    = new("--bar-graph-selection-rim-color");
+        static readonly CustomStyleProperty<Color> k_SegSelectionColor    = new("--bar-graph-segment-selection-color");
         static readonly CustomStyleProperty<Color> k_DragRectFillColor    = new("--bar-graph-drag-rect-fill-color");
         static readonly CustomStyleProperty<Color> k_DragRectBorderColor  = new("--bar-graph-drag-rect-border-color");
         static readonly CustomStyleProperty<Color> k_FocusRimColor        = new("--bar-graph-focus-rim-color");
@@ -56,6 +57,7 @@ namespace BarGraph.Core
 
         // Floats
         static readonly CustomStyleProperty<float> k_SelectionRimWidth    = new("--bar-graph-selection-rim-width");
+        static readonly CustomStyleProperty<float> k_SegSelectionWidth    = new("--bar-graph-segment-selection-width");
         static readonly CustomStyleProperty<float> k_OverlayOpacity       = new("--bar-graph-overlay-opacity");
         static readonly CustomStyleProperty<float> k_BarSpacingRatio      = new("--bar-graph-bar-spacing-ratio");
         static readonly CustomStyleProperty<float> k_MinBarWidth          = new("--bar-graph-min-bar-width");
@@ -83,12 +85,14 @@ namespace BarGraph.Core
             public Color HoverTintColor;
             public Color SelectionFillColor;
             public Color SelectionRimColor;
+            public Color SegSelectionColor;
             public Color DragRectFillColor;
             public Color DragRectBorderColor;
             public Color FocusRimColor;
             public Color OverlayTint;
 
             public float SelectionRimWidth;
+            public float SegSelectionWidth;
             public float OverlayOpacity;
             public float BarSpacingRatio;
             public float MinBarWidthPx;
@@ -111,12 +115,14 @@ namespace BarGraph.Core
             HoverTintColor     = new Color(1.00f, 1.00f, 1.00f, 0.18f),
             SelectionFillColor = new Color(1.00f, 1.00f, 1.00f, 0.22f),
             SelectionRimColor  = new Color(0.40f, 0.70f, 1.00f, 0.90f),
+            SegSelectionColor  = new Color(1.00f, 0.80f, 0.20f, 1.00f),
             DragRectFillColor  = new Color(0.35f, 0.65f, 1.00f, 0.08f),
             DragRectBorderColor= new Color(0.35f, 0.65f, 1.00f, 0.60f),
             FocusRimColor      = new Color(1.00f, 0.80f, 0.20f, 1.00f),
             OverlayTint        = new Color(1.00f, 1.00f, 1.00f, 0.38f),
 
             SelectionRimWidth  = 1.5f,
+            SegSelectionWidth  = 2.5f,
             OverlayOpacity     = 0.35f,
             BarSpacingRatio    = 0.12f,
             MinBarWidthPx      = 1f,
@@ -278,12 +284,17 @@ namespace BarGraph.Core
             if (cs.TryGetValue(k_HoverTintColor,       out c))    _vis.HoverTintColor        = c;
             if (cs.TryGetValue(k_SelectionFillColor,   out c))    _vis.SelectionFillColor    = c;
             if (cs.TryGetValue(k_SelectionRimColor,    out c))    _vis.SelectionRimColor     = c;
+            // Segment selection inherits from focus rim color (the visible "selection"
+            // outline on bars) unless explicitly overridden via USS.
+            _vis.SegSelectionColor = _vis.FocusRimColor;
+            if (cs.TryGetValue(k_SegSelectionColor,    out c))    _vis.SegSelectionColor     = c;
             if (cs.TryGetValue(k_DragRectFillColor,    out c))    _vis.DragRectFillColor     = c;
             if (cs.TryGetValue(k_DragRectBorderColor,  out c))    _vis.DragRectBorderColor   = c;
             if (cs.TryGetValue(k_FocusRimColor,        out c))    _vis.FocusRimColor         = c;
             if (cs.TryGetValue(k_OverlayTint,          out c))    _vis.OverlayTint           = c;
 
             if (cs.TryGetValue(k_SelectionRimWidth,    out var f)) _vis.SelectionRimWidth    = f;
+            if (cs.TryGetValue(k_SegSelectionWidth,    out f))     _vis.SegSelectionWidth    = f;
             if (cs.TryGetValue(k_OverlayOpacity,       out f))    _vis.OverlayOpacity        = f;
             if (cs.TryGetValue(k_BarSpacingRatio,      out f))    _vis.BarSpacingRatio       = f;
             if (cs.TryGetValue(k_MinBarWidth,          out f))    _vis.MinBarWidthPx         = f;
@@ -370,6 +381,11 @@ namespace BarGraph.Core
 
         /// <summary> Read-only access to the chart model bar count </summary>
         public int BarCount => _model.BarCount;
+
+        /// <summary>Returns the number of segments in the bar at <paramref name="barDataIndex"/>, or 0 if out of range.</summary>
+        internal int GetSegmentCount(int barDataIndex)
+            => barDataIndex >= 0 && barDataIndex < _model.BarCount
+                ? _model.Bars[barDataIndex].SegmentCount : 0;
         
         /// <summary>Read-only access to the live view state (for external inspection).</summary>
         public ChartViewState ViewState => _viewState;
@@ -685,6 +701,11 @@ namespace BarGraph.Core
         {
             if (!_settings.EnableSelection) return;
             if (!additive) _viewState.SelectedBars.Clear();
+
+            // Bar selection clears segment selection
+            _viewState.SelectedSegmentBar   = -1;
+            _viewState.SelectedSegmentIndex = -1;
+
             if (dataIndex >= 0)
             {
                 if (!_viewState.SelectedBars.Add(dataIndex))
@@ -704,29 +725,44 @@ namespace BarGraph.Core
                 using var uiEvt = BarClickedUIEvent.GetPooled(dataIndex, val);
                 uiEvt.target = this;
                 SendEvent(uiEvt);
+            }
+        }
 
-                // Fire segment click if hover has resolved a segment in this bar.
-                // Hover is updated every mouse move, so by click time it's current.
-                if (_viewState.HoveredSegmentBar == dataIndex
-                    && _viewState.HoveredSegmentIndex >= 0)
+        /// <summary>
+        /// Selects a single segment within a bar.  Clears bar selection and
+        /// fires <see cref="SegmentClicked"/>.  Called by the selection handler
+        /// when the click lands on a resolved segment.
+        /// </summary>
+        internal void InternalSelectSegment(int barDataIndex, int segmentIndex)
+        {
+            if (!_settings.EnableSelection) return;
+
+            // Segment selection clears bar selection
+            _viewState.SelectedBars.Clear();
+            _viewState.SelectedSegmentBar   = barDataIndex;
+            _viewState.SelectedSegmentIndex = segmentIndex;
+            FireSelectionChanged();
+            MarkDirtyRepaint();
+
+            if (barDataIndex >= 0 && barDataIndex < _model.BarCount)
+            {
+                ref readonly BarEntry bar = ref _model.Bars[barDataIndex];
+                if (segmentIndex >= 0 && segmentIndex < bar.SegmentCount)
                 {
-                    ref readonly BarEntry bar = ref _model.Bars[dataIndex];
-                    int si = _viewState.HoveredSegmentIndex;
-                    if (si < bar.SegmentCount)
-                    {
-                        ref readonly BarSegment seg = ref _model.Segments[bar.SegmentStart + si];
+                    ref readonly BarSegment seg = ref _model.Segments[bar.SegmentStart + segmentIndex];
+                    int displayIdx = barDataIndex < _viewState.DataToDisplay.Length
+                        ? _viewState.DataToDisplay[barDataIndex] : barDataIndex;
 
-                        SegmentClicked?.Invoke(new SegmentEventArgs
-                        {
-                            BarDataIndex    = dataIndex,
-                            BarDisplayIndex = displayIdx,
-                            SegmentIndex    = si,
-                            Tag             = seg.Tag,
-                            Value           = seg.Value,
-                            Color           = seg.Color,
-                            LocalPosition   = Vector2.zero,
-                        });
-                    }
+                    SegmentClicked?.Invoke(new SegmentEventArgs
+                    {
+                        BarDataIndex    = barDataIndex,
+                        BarDisplayIndex = displayIdx,
+                        SegmentIndex    = segmentIndex,
+                        Tag             = seg.Tag,
+                        Value           = seg.Value,
+                        Color           = seg.Color,
+                        LocalPosition   = Vector2.zero,
+                    });
                 }
             }
         }
@@ -1448,8 +1484,11 @@ namespace BarGraph.Core
             }
 
             // ── Hovered bar tint — always single-bar, always fast ──────────────
+            // Skip when a segment is hovered — the segment highlight provides
+            // feedback, and a full-bar tint would paint over segment selection.
             int hovIdx = _viewState.HoveredBarIndex;
-            if (hovIdx >= 0 && hovIdx < _model.BarCount)
+            if (hovIdx >= 0 && hovIdx < _model.BarCount
+                && (_viewState.HoveredSegmentIndex < 0 || GetSegmentCount(hovIdx) <= 1))
             {
                 int displayIdx = hovIdx < _viewState.DataToDisplay.Length
                     ? _viewState.DataToDisplay[hovIdx] : hovIdx;
@@ -1464,10 +1503,58 @@ namespace BarGraph.Core
                 p.Fill();
             }
 
+            // ── Selected segment highlight (persistent until next click) ────────
+            int selSegBar = _viewState.SelectedSegmentBar;
+            int selSegIdx = _viewState.SelectedSegmentIndex;
+            if (!lodMode && selSegBar >= 0 && selSegBar < _model.BarCount && selSegIdx >= 0)
+            {
+                ref readonly BarEntry selBar = ref _model.Bars[selSegBar];
+                if (selSegIdx < selBar.SegmentCount)
+                {
+                    int displayIdx = selSegBar < _viewState.DataToDisplay.Length
+                        ? _viewState.DataToDisplay[selSegBar] : selSegBar;
+                    SnapBarX(displayIdx, plotX, stride, barW, out float sx, out float sw);
+
+                    float yScale  = plotH / _effectiveMaxY * _viewState.ZoomY;
+                    float yOffset = _viewState.PanY * plotH;
+                    float yBottom = plotY2 + yOffset;
+
+                    for (int s = 0; s <= selSegIdx; s++)
+                    {
+                        ref readonly BarSegment seg = ref _model.Segments[selBar.SegmentStart + s];
+                        float segH = seg.Value * yScale;
+                        if (s == selSegIdx)
+                        {
+                            float yTop    = yBottom - segH;
+                            float drawTop = Mathf.Max(yTop, plotY2 - plotH);
+                            float drawBot = Mathf.Min(yBottom, plotY2);
+                            float drawH   = drawBot - drawTop;
+                            if (drawH >= 0.5f)
+                            {
+                                // Outline only — visually distinct from hover's fill tint.
+                                // Color and width controlled via USS:
+                                //   --bar-graph-segment-selection-color
+                                //   --bar-graph-segment-selection-width
+                                p.strokeColor = _vis.SegSelectionColor;
+                                p.lineWidth   = _vis.SegSelectionWidth;
+                                p.BeginPath();
+                                PathRect(p, sx, drawTop, sw, drawH);
+                                p.Stroke();
+                            }
+                            break;
+                        }
+                        yBottom -= segH;
+                    }
+                }
+            }
+
             // ── Hovered segment highlight — single segment rect + outline ────────
+            // Skip when hovering the already-selected segment so the selection
+            // outline remains visible without hover tint painting over it.
             int segBar = _viewState.HoveredSegmentBar;
             int segIdx = _viewState.HoveredSegmentIndex;
-            if (!lodMode && segBar >= 0 && segBar < _model.BarCount && segIdx >= 0)
+            if (!lodMode && segBar >= 0 && segBar < _model.BarCount && segIdx >= 0
+                && !(segBar == selSegBar && segIdx == selSegIdx))
             {
                 ref readonly BarEntry bar = ref _model.Bars[segBar];
                 if (segIdx < bar.SegmentCount)
@@ -1856,10 +1943,16 @@ namespace BarGraph.Core
 
         private void OnDataChanged()
         {
+            _viewState.SelectedBars.Clear();
+            _viewState.SelectedSegmentBar   = -1;
+            _viewState.SelectedSegmentIndex = -1;
+            _viewState.HoveredBarIndex      = -1;
+            _viewState.HoveredSegmentBar    = -1;
+            _viewState.HoveredSegmentIndex  = -1;
+            _viewState.FocusedBarIndex      = -1;
+
             RecalcBounds();
             _viewState.SortDirty = true;
-            _viewState.HoveredSegmentBar   = -1;
-            _viewState.HoveredSegmentIndex = -1;
             EnsureLabelPool();
             MarkDirtyRepaint();
         }

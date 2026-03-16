@@ -52,9 +52,21 @@ namespace BarGraph.Input.Handlers
         private void OnReleased(Vector2 pos)
         {
             if (_dragging)
+            {
                 _element.InternalCommitDragSelection(MakeRect(_dragStart, pos), _additive);
+            }
             else
-                _element.InternalSelectBar(_clickedBar, _additive);
+            {
+                // If cursor is over a resolved segment in a multi-segment bar,
+                // select the segment only.  Single-segment bars use bar selection
+                // so the highlight covers the full bar height.
+                var vs = _element.ViewState;
+                if (vs.HoveredSegmentBar >= 0 && vs.HoveredSegmentIndex >= 0
+                    && _element.GetSegmentCount(vs.HoveredSegmentBar) > 1)
+                    _element.InternalSelectSegment(vs.HoveredSegmentBar, vs.HoveredSegmentIndex);
+                else
+                    _element.InternalSelectBar(_clickedBar, _additive);
+            }
 
             _dragging = false;
         }

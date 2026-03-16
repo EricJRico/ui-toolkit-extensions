@@ -69,6 +69,12 @@ namespace BarGraph.Core
         /// <summary>Data indices of all selected bars.  HashSet for O(1) Contains.</summary>
         public readonly HashSet<int> SelectedBars = new HashSet<int>();
 
+        /// <summary>Data index of the bar containing the selected segment, or -1.</summary>
+        public int SelectedSegmentBar = -1;
+
+        /// <summary>Segment index within the selected bar's segment array, or -1.</summary>
+        public int SelectedSegmentIndex = -1;
+
         // ── Sort ──────────────────────────────────────────────────────────────
 
         public SortMode SortMode = SortMode.None;
