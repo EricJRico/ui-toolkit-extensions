@@ -97,6 +97,7 @@ namespace BarGraph.AnimationDemo
             Graph.SetInputSource(new BarGraphUIToolkitInput());
             Graph.AddHandler(new BarGraphHoverHandler());
             Graph.AddHandler(new BarGraphSelectionHandler());
+            Graph.AddHandler(new BarGraphKeyboardSelectionHandler());
             Graph.AddHandler(new BarGraphPanHandler());
             Graph.AddHandler(new BarGraphZoomHandler());
 

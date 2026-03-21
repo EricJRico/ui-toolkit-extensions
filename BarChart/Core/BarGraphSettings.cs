@@ -30,6 +30,8 @@ namespace BarGraph.Core
         public bool  EnableMousePan   = true;
         public bool  EnableYPan       = false;
         public bool  EnableSelection  = true;
+        public bool  ClearBarsOnSegmentSelect  = true;
+        public bool  ShowSegmentHighlightInLod = false;
         [Range(0.02f, 0.5f)]
         public float ZoomSpeed = 0.12f;
 

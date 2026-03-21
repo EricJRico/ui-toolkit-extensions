@@ -30,6 +30,5 @@
     color: rgb(100, 220, 200);
     font-size: 9px;
     -unity-font-style: italic;
-    text-transform: uppercase;
     letter-spacing: 2px;
 }

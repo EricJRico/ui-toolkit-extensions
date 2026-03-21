@@ -28,6 +28,5 @@
 .bar-graph--ship-systems-hud .bar-graph__label--x {
     color: rgb(200, 150, 40);
     font-size: 9px;
-    text-transform: uppercase;
     letter-spacing: 2px;
 }

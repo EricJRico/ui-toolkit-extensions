@@ -36,8 +36,10 @@ namespace BarGraph.Core
         public bool  HasOverlay   => _overlayBarCount > 0;
 
         // ── Events ─────────────────────────────────────────────────────────────
-        /// <summary>Raised after any data mutation. Fires on the calling thread.</summary>
+        /// <summary>Raised after primary data mutation. Fires on the calling thread.</summary>
         public event Action DataChanged;
+        /// <summary>Raised after overlay data mutation. Fires on the calling thread.</summary>
+        public event Action OverlayChanged;
 
         // ── Read accessors (no allocation) ─────────────────────────────────────
         public int BarCount      => _barCount;
@@ -144,7 +146,7 @@ namespace BarGraph.Core
             _overlayBarCount     = barCount;
             _overlaySegmentCount = segCount;
             RecalcOverlayBounds();
-            DataChanged?.Invoke();
+            OverlayChanged?.Invoke();
         }
 
         /// <summary>Convenience flat-float overlay.</summary>
@@ -162,7 +164,7 @@ namespace BarGraph.Core
             _overlayBarCount     = n;
             _overlaySegmentCount = n;
             RecalcOverlayBounds();
-            DataChanged?.Invoke();
+            OverlayChanged?.Invoke();
         }
 
         /// <summary>Remove the overlay series.</summary>
@@ -171,7 +173,7 @@ namespace BarGraph.Core
             _overlayBarCount     = 0;
             _overlaySegmentCount = 0;
             MaxOverlayY          = 1f;
-            DataChanged?.Invoke();
+            OverlayChanged?.Invoke();
         }
 
         // ─────────────────────────────────────────────────────────────────────

@@ -29,5 +29,5 @@
     color: rgb(50, 255, 50);
     font-size: 11px;
     -unity-font-style: bold;
-    text-transform: uppercase;
+
 }

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/ericj/repos/GCAllocAnalyzer-Dev/Packages/**)",
+      "Read(//c/Users/ericj/repos/GCAllocAnalyzer-Dev/Assets/**)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\ericj\\repos\\GCAllocAnalyzer-Dev\\Assets\\Tests"
+    ]
+  }
+}

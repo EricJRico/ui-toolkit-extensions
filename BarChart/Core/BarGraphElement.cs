@@ -201,23 +201,14 @@ namespace BarGraph.Core
         //  Public events (Action<T> → zero-alloc dispatch with stack-only args)
         // ─────────────────────────────────────────────────────────────────────
 
-        /// <summary>Fired when a bar is clicked or activated via keyboard.</summary>
-        public event Action<BarClickedEventArgs>     BarClicked;
-
-        /// <summary>Fired whenever the selection set changes.</summary>
+        /// <summary>Fired whenever the selection set changes (state notification).</summary>
         public event Action<SelectionChangedEventArgs> SelectionChanged;
 
-        /// <summary>Fired when a rubber-band drag-select gesture completes.</summary>
-        public event Action<DragCompletedEventArgs>  DragCompleted;
-
-        /// <summary>Fired when the bar under the cursor changes (or cursor leaves).</summary>
+        /// <summary>Fired when the bar under the cursor changes (or cursor leaves — state notification).</summary>
         public event Action<HoverChangedEventArgs>   HoverChanged;
 
-        /// <summary>Fired after zoom or pan changes.</summary>
+        /// <summary>Fired after zoom or pan changes (state notification).</summary>
         public event Action<ViewChangedEventArgs>    ViewChanged;
-
-        /// <summary>Fired when a segment is clicked (single-segment inspect).</summary>
-        public event Action<SegmentEventArgs>        SegmentClicked;
 
         /// <summary>
         /// Fired when the segment under the cursor changes (or cursor leaves all segments).
@@ -268,8 +259,9 @@ namespace BarGraph.Core
                 schedule.Execute(FlushLabelPositions).Every(0));
             RegisterCallback<CustomStyleResolvedEvent>(_ => ResolveCustomStyles());
 
-            RegisterCallback<KeyDownEvent>(OnKeyDown);
-            _model.DataChanged += OnDataChanged;
+            // Keyboard selection extracted to BarGraphKeyboardSelectionHandler
+            _model.DataChanged    += OnDataChanged;
+            _model.OverlayChanged += OnOverlayChanged;
         }
 
         /// <summary>
@@ -278,40 +270,46 @@ namespace BarGraph.Core
         /// </summary>
         private void ResolveCustomStyles()
         {
-            var cs = customStyle;
+            // Colors — skipped when a C# override is active for that property
+            TryResolveColor(k_BgColor,             VisualProperty.BackgroundColor,     ref _vis.BackgroundColor);
+            TryResolveColor(k_DefaultBarColor,     VisualProperty.DefaultBarColor,     ref _vis.DefaultBarColor);
+            TryResolveColor(k_AxisColor,           VisualProperty.AxisColor,           ref _vis.AxisColor);
+            TryResolveColor(k_GridLineColor,       VisualProperty.GridLineColor,       ref _vis.GridLineColor);
+            TryResolveColor(k_HoverTintColor,      VisualProperty.HoverTintColor,      ref _vis.HoverTintColor);
+            TryResolveColor(k_SelectionFillColor,  VisualProperty.SelectionFillColor,  ref _vis.SelectionFillColor);
+            TryResolveColor(k_SelectionRimColor,   VisualProperty.SelectionRimColor,   ref _vis.SelectionRimColor);
+            TryResolveColor(k_FocusRimColor,       VisualProperty.FocusRimColor,       ref _vis.FocusRimColor);
 
-            if (cs.TryGetValue(k_BgColor,             out var c)) _vis.BackgroundColor     = c;
-            if (cs.TryGetValue(k_DefaultBarColor,      out c))    _vis.DefaultBarColor      = c;
-            if (cs.TryGetValue(k_AxisColor,            out c))    _vis.AxisColor             = c;
-            if (cs.TryGetValue(k_GridLineColor,        out c))    _vis.GridLineColor         = c;
-            if (cs.TryGetValue(k_HoverTintColor,       out c))    _vis.HoverTintColor        = c;
-            if (cs.TryGetValue(k_SelectionFillColor,   out c))    _vis.SelectionFillColor    = c;
-            if (cs.TryGetValue(k_SelectionRimColor,    out c))    _vis.SelectionRimColor     = c;
             // Segment selection inherits from focus rim color (the visible "selection"
-            // outline on bars) unless explicitly overridden via USS.
-            _vis.SegSelectionColor = _vis.FocusRimColor;
-            if (cs.TryGetValue(k_SegSelectionColor,    out c))    _vis.SegSelectionColor     = c;
-            if (cs.TryGetValue(k_DragRectFillColor,    out c))    _vis.DragRectFillColor     = c;
-            if (cs.TryGetValue(k_DragRectBorderColor,  out c))    _vis.DragRectBorderColor   = c;
-            if (cs.TryGetValue(k_FocusRimColor,        out c))    _vis.FocusRimColor         = c;
-            if (cs.TryGetValue(k_OverlayTint,          out c))    _vis.OverlayTint           = c;
+            // outline on bars) unless explicitly overridden via C# or USS.
+            if (!HasOverride(VisualProperty.SegSelectionColor))
+            {
+                _vis.SegSelectionColor = _vis.FocusRimColor;
+                if (customStyle.TryGetValue(k_SegSelectionColor, out var segC))
+                    _vis.SegSelectionColor = segC;
+            }
 
-            if (cs.TryGetValue(k_SelectionRimWidth,    out var f)) _vis.SelectionRimWidth    = f;
-            if (cs.TryGetValue(k_SegSelectionWidth,    out f))     _vis.SegSelectionWidth    = f;
-            if (cs.TryGetValue(k_OverlayOpacity,       out f))    _vis.OverlayOpacity        = f;
-            if (cs.TryGetValue(k_BarSpacingRatio,      out f))    _vis.BarSpacingRatio       = f;
-            if (cs.TryGetValue(k_MinBarWidth,          out f))    _vis.MinBarWidthPx         = f;
-            if (cs.TryGetValue(k_GridLineWidth,        out f))    _vis.GridLineWidth         = f;
-            if (cs.TryGetValue(k_AxisLineWidth,        out f))    _vis.AxisLineWidth         = f;
-            if (cs.TryGetValue(k_PaddingLeft,          out f))    _vis.PaddingLeft           = f;
-            if (cs.TryGetValue(k_PaddingRight,         out f))    _vis.PaddingRight          = f;
-            if (cs.TryGetValue(k_PaddingTop,           out f))    _vis.PaddingTop            = f;
-            if (cs.TryGetValue(k_PaddingBottom,        out f))    _vis.PaddingBottom         = f;
-            if (cs.TryGetValue(k_LabelHeight,          out f))    _vis.LabelHeight           = f;
-            if (cs.TryGetValue(k_XLabelWidth,          out f))    _vis.XLabelWidth           = f;
-            if (cs.TryGetValue(k_XLabelOffsetY,        out f))    _vis.XLabelOffsetY         = f;
-            if (cs.TryGetValue(k_YLabelGap,            out f))    _vis.YLabelGap             = f;
-            if (cs.TryGetValue(k_DimOpacity,           out f))    _vis.DimOpacity            = f;
+            TryResolveColor(k_DragRectFillColor,   VisualProperty.DragRectFillColor,   ref _vis.DragRectFillColor);
+            TryResolveColor(k_DragRectBorderColor,  VisualProperty.DragRectBorderColor, ref _vis.DragRectBorderColor);
+            TryResolveColor(k_OverlayTint,          VisualProperty.OverlayTint,         ref _vis.OverlayTint);
+
+            // Floats — skipped when a C# override is active for that property
+            TryResolveFloat(k_SelectionRimWidth,   VisualProperty.SelectionRimWidth,   ref _vis.SelectionRimWidth);
+            TryResolveFloat(k_SegSelectionWidth,   VisualProperty.SegSelectionWidth,   ref _vis.SegSelectionWidth);
+            TryResolveFloat(k_OverlayOpacity,      VisualProperty.OverlayOpacity,      ref _vis.OverlayOpacity);
+            TryResolveFloat(k_BarSpacingRatio,     VisualProperty.BarSpacingRatio,     ref _vis.BarSpacingRatio);
+            TryResolveFloat(k_MinBarWidth,         VisualProperty.MinBarWidthPx,       ref _vis.MinBarWidthPx);
+            TryResolveFloat(k_GridLineWidth,       VisualProperty.GridLineWidth,       ref _vis.GridLineWidth);
+            TryResolveFloat(k_AxisLineWidth,       VisualProperty.AxisLineWidth,       ref _vis.AxisLineWidth);
+            TryResolveFloat(k_PaddingLeft,         VisualProperty.PaddingLeft,         ref _vis.PaddingLeft);
+            TryResolveFloat(k_PaddingRight,        VisualProperty.PaddingRight,        ref _vis.PaddingRight);
+            TryResolveFloat(k_PaddingTop,          VisualProperty.PaddingTop,          ref _vis.PaddingTop);
+            TryResolveFloat(k_PaddingBottom,       VisualProperty.PaddingBottom,       ref _vis.PaddingBottom);
+            TryResolveFloat(k_LabelHeight,         VisualProperty.LabelHeight,         ref _vis.LabelHeight);
+            TryResolveFloat(k_XLabelWidth,         VisualProperty.XLabelWidth,         ref _vis.XLabelWidth);
+            TryResolveFloat(k_XLabelOffsetY,       VisualProperty.XLabelOffsetY,       ref _vis.XLabelOffsetY);
+            TryResolveFloat(k_YLabelGap,           VisualProperty.YLabelGap,           ref _vis.YLabelGap);
+            TryResolveFloat(k_DimOpacity,          VisualProperty.DimOpacity,          ref _vis.DimOpacity);
 
             RebuildLabelPool();
             MarkDirtyRepaint();
@@ -387,7 +385,7 @@ namespace BarGraph.Core
         public int BarCount => _model.BarCount;
 
         /// <summary>Returns the number of segments in the bar at <paramref name="barDataIndex"/>, or 0 if out of range.</summary>
-        internal int GetSegmentCount(int barDataIndex)
+        public int GetSegmentCount(int barDataIndex)
             => barDataIndex >= 0 && barDataIndex < _model.BarCount
                 ? _model.Bars[barDataIndex].SegmentCount : 0;
         
@@ -397,13 +395,22 @@ namespace BarGraph.Core
         /// <summary>Current behavioural settings. Use <see cref="UpdateSettings"/> to apply changes.</summary>
         public BarGraphSettings Settings => _settings;
 
-        // ── Resolved visual accessors (for handlers that need layout values) ──
-        internal float VisPaddingLeft   => _vis.PaddingLeft;
-        internal float VisPaddingRight  => _vis.PaddingRight;
-        internal float VisPaddingTop    => _vis.PaddingTop;
-        internal float VisPaddingBottom => _vis.PaddingBottom;
-        internal float VisLabelHeight   => _vis.LabelHeight;
-        internal float VisXLabelOffsetY => _vis.XLabelOffsetY;
+        /// <summary>Read-only access to the bar array. Do not write past BarCount-1.</summary>
+        public BarEntry[] Bars => _model.Bars;
+
+        /// <summary>Read-only access to the segment array. Do not write past SegmentCount-1.</summary>
+        public BarSegment[] Segments => _model.Segments;
+
+        /// <summary>Number of segments in the current dataset.</summary>
+        public int SegmentCount => _model.SegmentCount;
+
+        /// <summary>Retrieve a registered handler by type, or null if not found.</summary>
+        public T GetHandler<T>() where T : class, IBarGraphHandler
+        {
+            for (int i = 0; i < _handlers.Count; i++)
+                if (_handlers[i] is T h) return h;
+            return null;
+        }
 
         /// <summary>
         /// Pluggable Y-axis label formatter.
@@ -492,6 +499,17 @@ namespace BarGraph.Core
             MarkDirtyRepaint();
         }
 
+        /// <summary>
+        /// Override the bar spacing ratio programmatically.
+        /// 0 = contiguous, 0.12 = 12% gap (USS default). Takes precedence over USS.
+        /// </summary>
+        public void SetBarSpacingRatio(float ratio)
+        {
+            _vis.BarSpacingRatio = Mathf.Clamp01(ratio);
+            _visOverrides |= (uint)VisualProperty.BarSpacingRatio;
+            MarkDirtyRepaint();
+        }
+
         /// <summary>Change the display sort order.</summary>
         public void SetSortMode(SortMode mode, bool descending = true)
         {
@@ -568,7 +586,11 @@ namespace BarGraph.Core
                 (snap.FocusedBarIndex >= 0 && snap.FocusedBarIndex < barCount)
                     ? snap.FocusedBarIndex : -1;
 
+            // Direct mutation for bulk restore — avoids N SelectionChanged events.
+            // Single FireSelectionChanged() call below covers the state change.
             _viewState.SelectedBars.Clear();
+            _viewState.SelectedSegmentBar   = -1;
+            _viewState.SelectedSegmentIndex = -1;
             if (snap.SelectedBars != null)
             {
                 for (int i = 0; i < snap.SelectedBars.Length; i++)
@@ -701,6 +723,119 @@ namespace BarGraph.Core
             MarkDirtyRepaint();
         }
 
+        // ─────────────────────────────────────────────────────────────────────
+        //  Public selection API
+        //  Consumers call these to mutate selection state.
+        //  Each fires SelectionChanged.  Handlers decide WHEN to call them.
+        // ─────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Adds <paramref name="dataIndex"/> to the selection set.
+        /// When <paramref name="additive"/> is false, clears existing selection first.
+        /// Clears segment selection. Fires <see cref="SelectionChanged"/>.
+        /// </summary>
+        public void SelectBar(int dataIndex, bool additive = false)
+        {
+            if (!_settings.EnableSelection) return;
+            if (!additive) _viewState.SelectedBars.Clear();
+
+            _viewState.SelectedSegmentBar   = -1;
+            _viewState.SelectedSegmentIndex = -1;
+
+            if (dataIndex >= 0)
+            {
+                _viewState.SelectedBars.Add(dataIndex);
+                _viewState.FocusedBarIndex = dataIndex;
+            }
+            FireSelectionChanged();
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>
+        /// Removes <paramref name="dataIndex"/> from the selection set.
+        /// No-op if <paramref name="dataIndex"/> is not currently selected.
+        /// Fires <see cref="SelectionChanged"/>.
+        /// </summary>
+        public void DeselectBar(int dataIndex)
+        {
+            _viewState.SelectedBars.Remove(dataIndex);
+            FireSelectionChanged();
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>
+        /// If <paramref name="dataIndex"/> is not selected, adds it; if already selected, removes it.
+        /// When <paramref name="additive"/> is false, clears existing selection before toggling.
+        /// Clears segment selection. Fires <see cref="SelectionChanged"/>.
+        /// </summary>
+        public void ToggleBar(int dataIndex, bool additive = false)
+            => InternalSelectBar(dataIndex, additive);
+
+        /// <summary>
+        /// Selects a single segment. Clears bar selection.
+        /// Fires <see cref="SelectionChanged"/>.
+        /// </summary>
+        public void SelectSegment(int barDataIndex, int segmentIndex)
+            => InternalSelectSegment(barDataIndex, segmentIndex);
+
+        /// <summary>
+        /// Clears all bar and segment selection.
+        /// Fires <see cref="SelectionChanged"/>.
+        /// </summary>
+        public void ClearSelection()
+        {
+            _viewState.SelectedBars.Clear();
+            _viewState.SelectedSegmentBar   = -1;
+            _viewState.SelectedSegmentIndex = -1;
+            _viewState.FocusedBarIndex      = -1;
+            FireSelectionChanged();
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>
+        /// Clears segment selection without affecting bar selection (dimming).
+        /// </summary>
+        public void ClearSegmentSelection()
+        {
+            _viewState.SelectedSegmentBar   = -1;
+            _viewState.SelectedSegmentIndex = -1;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>
+        /// Selects all bars. Clears segment selection.
+        /// Fires <see cref="SelectionChanged"/>.
+        /// </summary>
+        public void SelectAll()
+        {
+            _viewState.SelectedBars.Clear();
+            _viewState.SelectedSegmentBar   = -1;
+            _viewState.SelectedSegmentIndex = -1;
+            for (int i = 0; i < _model.BarCount; i++)
+                _viewState.SelectedBars.Add(i);
+            FireSelectionChanged();
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>Show the drag-selection rectangle during a drag gesture.</summary>
+        public void UpdateDragRect(Rect rect)
+            => InternalUpdateDragRect(rect);
+
+        /// <summary>
+        /// Commit a drag-selection: selects all bars intersecting <paramref name="rect"/>.
+        /// Fires <see cref="SelectionChanged"/>.
+        /// </summary>
+        public void CommitDragSelection(Rect rect, bool additive = false)
+            => InternalCommitDragSelection(rect, additive);
+
+        /// <summary>Cancel an in-progress drag without committing.</summary>
+        public void CancelDrag()
+            => InternalCancelDrag();
+
+        /// <summary>Scrolls PanX so <paramref name="dataIndex"/> is within the visible window.</summary>
+        public void EnsureBarVisible(int dataIndex)
+            => EnsureBarVisible_Internal(dataIndex);
+
         internal void InternalSelectBar(int dataIndex, bool additive)
         {
             if (!_settings.EnableSelection) return;
@@ -718,57 +853,23 @@ namespace BarGraph.Core
             }
             FireSelectionChanged();
             MarkDirtyRepaint();
-
-            if (dataIndex >= 0)
-            {
-                int displayIdx = dataIndex < _viewState.DataToDisplay.Length
-                    ? _viewState.DataToDisplay[dataIndex] : dataIndex;
-                float val = _model.Bars[dataIndex].TotalValue;
-                BarClicked?.Invoke(new BarClickedEventArgs(dataIndex, displayIdx, val, Vector2.zero));
-
-                using var uiEvt = BarClickedUIEvent.GetPooled(dataIndex, val);
-                uiEvt.target = this;
-                SendEvent(uiEvt);
-            }
         }
 
         /// <summary>
-        /// Selects a single segment within a bar.  Clears bar selection and
-        /// fires <see cref="SegmentClicked"/>.  Called by the selection handler
-        /// when the click lands on a resolved segment.
+        /// Selects a single segment within a bar.
+        /// Clears bar selection unless <see cref="BarGraphSettings.ClearBarsOnSegmentSelect"/> is false.
+        /// Fires <see cref="SelectionChanged"/>.
         /// </summary>
         internal void InternalSelectSegment(int barDataIndex, int segmentIndex)
         {
             if (!_settings.EnableSelection) return;
 
-            // Segment selection clears bar selection
-            _viewState.SelectedBars.Clear();
+            if (_settings.ClearBarsOnSegmentSelect)
+                _viewState.SelectedBars.Clear();
             _viewState.SelectedSegmentBar   = barDataIndex;
             _viewState.SelectedSegmentIndex = segmentIndex;
             FireSelectionChanged();
             MarkDirtyRepaint();
-
-            if (barDataIndex >= 0 && barDataIndex < _model.BarCount)
-            {
-                ref readonly BarEntry bar = ref _model.Bars[barDataIndex];
-                if (segmentIndex >= 0 && segmentIndex < bar.SegmentCount)
-                {
-                    ref readonly BarSegment seg = ref _model.Segments[bar.SegmentStart + segmentIndex];
-                    int displayIdx = barDataIndex < _viewState.DataToDisplay.Length
-                        ? _viewState.DataToDisplay[barDataIndex] : barDataIndex;
-
-                    SegmentClicked?.Invoke(new SegmentEventArgs
-                    {
-                        BarDataIndex    = barDataIndex,
-                        BarDisplayIndex = displayIdx,
-                        SegmentIndex    = segmentIndex,
-                        Tag             = seg.Tag,
-                        Value           = seg.Value,
-                        Color           = seg.Color,
-                        LocalPosition   = Vector2.zero,
-                    });
-                }
-            }
         }
 
         internal void InternalUpdateDragRect(Rect rect)
@@ -785,11 +886,13 @@ namespace BarGraph.Core
 
             if (!additive) _viewState.SelectedBars.Clear();
 
+            // Drag selection clears segment selection
+            _viewState.SelectedSegmentBar   = -1;
+            _viewState.SelectedSegmentIndex = -1;
+
             // Select all bars whose rendered rect intersects the drag rect
             CollectBarsInRect(rect, _viewState.SelectedBars);
             FireSelectionChanged();
-
-            DragCompleted?.Invoke(new DragCompletedEventArgs(rect, _viewState.SelectedBars));
             MarkDirtyRepaint();
         }
 
@@ -808,7 +911,7 @@ namespace BarGraph.Core
         /// Returns the DATA index of the bar under <paramref name="localPos"/>,
         /// or -1 if none.
         /// </summary>
-        internal int HitTestBar(Vector2 localPos)
+        public int HitTestBar(Vector2 localPos)
         {
             if (_model.BarCount == 0) return -1;
 
@@ -850,7 +953,7 @@ namespace BarGraph.Core
         /// the cursor is in a gap between segments.
         /// <para>O(segments_per_bar) — only called on mouse events, not per-frame.</para>
         /// </summary>
-        internal SegmentHitResult HitTestSegment(Vector2 localPos, int barDataIndex = -2)
+        public SegmentHitResult HitTestSegment(Vector2 localPos, int barDataIndex = -2)
         {
             if (_model.BarCount == 0) return SegmentHitResult.Miss;
 
@@ -904,99 +1007,11 @@ namespace BarGraph.Core
         //  Keyboard navigation
         // ─────────────────────────────────────────────────────────────────────
 
-        private void OnKeyDown(KeyDownEvent evt)
-        {
-            if (_model.BarCount == 0) return;
-
-            switch (evt.keyCode)
-            {
-                case KeyCode.RightArrow:
-                    MoveFocus(+1, evt.shiftKey);
-                    evt.StopPropagation();
-                    break;
-
-                case KeyCode.LeftArrow:
-                    MoveFocus(-1, evt.shiftKey);
-                    evt.StopPropagation();
-                    break;
-
-                case KeyCode.Home:
-                    SetFocus(0, evt.shiftKey);
-                    evt.StopPropagation();
-                    break;
-
-                case KeyCode.End:
-                    SetFocus(_model.BarCount - 1, evt.shiftKey);
-                    evt.StopPropagation();
-                    break;
-
-                case KeyCode.Return:
-                case KeyCode.Space:
-                    if (_viewState.FocusedBarIndex >= 0)
-                        ActivateFocusedBar();
-                    evt.StopPropagation();
-                    break;
-
-                case KeyCode.A when evt.ctrlKey:
-                    SelectAll();
-                    evt.StopPropagation();
-                    break;
-
-                case KeyCode.Escape:
-                    _viewState.SelectedBars.Clear();
-                    _viewState.FocusedBarIndex = -1;
-                    FireSelectionChanged();
-                    MarkDirtyRepaint();
-                    evt.StopPropagation();
-                    break;
-
-                case KeyCode.R when evt.ctrlKey:
-                    ResetView();
-                    evt.StopPropagation();
-                    break;
-            }
-        }
-
-        private void MoveFocus(int delta, bool extend)
-        {
-            int cur  = _viewState.FocusedBarIndex < 0 ? 0 : _viewState.FocusedBarIndex;
-            SetFocus(Mathf.Clamp(cur + delta, 0, _model.BarCount - 1), extend);
-        }
-
-        private void SetFocus(int dataIdx, bool extend)
-        {
-            _viewState.FocusedBarIndex = dataIdx;
-            if (!extend) _viewState.SelectedBars.Clear();
-            _viewState.SelectedBars.Add(dataIdx);
-            EnsureBarVisible(dataIdx);
-            FireSelectionChanged();
-            MarkDirtyRepaint();
-        }
-
-        private void ActivateFocusedBar()
-        {
-            int   dataIdx    = _viewState.FocusedBarIndex;
-            int   displayIdx = dataIdx < _viewState.DataToDisplay.Length
-                ? _viewState.DataToDisplay[dataIdx] : dataIdx;
-            float val        = _model.Bars[dataIdx].TotalValue;
-
-            BarClicked?.Invoke(new BarClickedEventArgs(dataIdx, displayIdx, val, Vector2.zero));
-
-            using var uiEvt = BarClickedUIEvent.GetPooled(dataIdx, val);
-            uiEvt.target = this;
-            SendEvent(uiEvt);
-        }
-
-        private void SelectAll()
-        {
-            _viewState.SelectedBars.Clear();
-            for (int i = 0; i < _model.BarCount; i++) _viewState.SelectedBars.Add(i);
-            FireSelectionChanged();
-            MarkDirtyRepaint();
-        }
+        // OnKeyDown, MoveFocus, SetFocus, ActivateFocusedBar, SelectAll
+        // extracted to BarGraphKeyboardSelectionHandler
 
         /// <summary>Scrolls PanX so <paramref name="dataIdx"/> is within the visible window.</summary>
-        private void EnsureBarVisible(int dataIdx)
+        private void EnsureBarVisible_Internal(int dataIdx)
         {
             EnsureSortMap();
             int displayIdx = dataIdx < _viewState.DataToDisplay.Length
@@ -1049,14 +1064,30 @@ namespace BarGraph.Core
             if (_settings.ShowGrid && _settings.GridLineCount > 0)
                 DrawGrid(p, plotX, plotX2, plotY, plotY2, plotH);
 
+            // Compute view-slice once for context + bar rendering
+            float ctxStride = 0f, ctxBarW = 0f;
+            int   ctxStart = -1, ctxEnd = -1;
+            if (_model.BarCount > 0)
+                CalcViewSlice(plotW, out ctxStride, out ctxBarW, out ctxStart, out ctxEnd);
+
+            // Build draw context for custom callbacks (stack-allocated, constructed once)
+            var plotRect = new Rect(plotX, plotY, plotW, plotH);
+            var drawCtx = new BarGraphDrawContext(
+                p, mgc, plotRect,
+                _viewState.ZoomX, _viewState.ZoomY,
+                _viewState.PanX, _viewState.PanY,
+                _effectiveMaxY, ctxStride, ctxBarW,
+                ctxStart, ctxEnd, _model.BarCount);
+
+            // ── Custom draw hook: before bars ──
+            _onDrawBeforeBars?.Invoke(in drawCtx);
+
             // 4 – Primary bars (stacked, segment-LOD, direct mesh)
             _quadCount = 0;   // Reset quad buffer for this repaint
 
             if (_model.BarCount > 0)
             {
-                CalcViewSlice(plotW, out float stride, out float barW,
-                              out int startDisp, out int endDisp);
-                int viewCount = endDisp - startDisp;
+                int viewCount = ctxEnd - ctxStart;
 
                 // Pre-size quad buffer to avoid repeated Array.Resize during
                 // the draw pass.  Direct path: segment merge caps output at
@@ -1064,7 +1095,7 @@ namespace BarGraph.Core
                 // Overlay may add a similar amount — multiply by 2 if present.
                 if (viewCount > 0)
                 {
-                    int estimatedQuads = stride >= 1f
+                    int estimatedQuads = ctxStride >= 1f
                         ? viewCount * Mathf.CeilToInt(plotH)
                         : Mathf.CeilToInt(plotW);
                     if (_model.HasOverlay) estimatedQuads *= 2;
@@ -1074,30 +1105,28 @@ namespace BarGraph.Core
 
                 if (viewCount > 0)
                 {
-                    if (stride >= 1f)
-                        DrawDirectBars(startDisp, endDisp, plotX, plotY2, stride, barW,
+                    if (ctxStride >= 1f)
+                        DrawDirectBars(ctxStart, ctxEnd, plotX, plotY2, ctxStride, ctxBarW,
                                        plotH, _model, false, 1f);
                     else
-                        DrawLodBars(startDisp, endDisp, plotX, plotY2, plotW, plotH,
-                                    _model, 1f);
+                        DrawLodBars(ctxStart, ctxEnd, plotX, plotY2, plotW, plotH,
+                                    _model, false, 1f);
                 }
             }
 
             // 5 – Overlay bars (same position mapping, tinted alpha)
             if (_model.HasOverlay && _model.BarCount > 0)
             {
-                CalcViewSlice(plotW, out float stride, out float barW,
-                              out int startDisp, out int endDisp);
-                int viewCount = endDisp - startDisp;
+                int viewCount = ctxEnd - ctxStart;
 
                 if (viewCount > 0)
                 {
-                    if (stride >= 1f)
-                        DrawDirectBars(startDisp, endDisp, plotX, plotY2, stride, barW,
+                    if (ctxStride >= 1f)
+                        DrawDirectBars(ctxStart, ctxEnd, plotX, plotY2, ctxStride, ctxBarW,
                                        plotH, _model, true, _vis.OverlayOpacity);
                     else
-                        DrawLodBars(startDisp, endDisp, plotX, plotY2, plotW, plotH,
-                                    _model, _vis.OverlayOpacity);
+                        DrawLodBars(ctxStart, ctxEnd, plotX, plotY2, plotW, plotH,
+                                    _model, true, _vis.OverlayOpacity);
                 }
             }
 
@@ -1105,6 +1134,9 @@ namespace BarGraph.Core
             // This bypasses Painter2D entirely — no tessellation, no vertex ceiling.
             if (_quadCount > 0)
                 FlushQuads(mgc);
+
+            // ── Custom draw hook: after bars ──
+            _onDrawAfterBars?.Invoke(in drawCtx);
 
             // 6 – Selection & hover highlights
             DrawHighlights(p, plotX, plotY2, plotH);
@@ -1127,6 +1159,9 @@ namespace BarGraph.Core
             // 8 – Axes (on top of bars and overdraw)
             if (_settings.ShowAxes)
                 DrawAxes(p, plotX, plotX2, plotY, plotY2);
+
+            // ── Custom draw hook: after all chrome ──
+            _onDrawAfterChrome?.Invoke(in drawCtx);
 
             // 9 – Cache label layout params for the deferred FlushLabelPositions
             //     scheduler (must NOT modify VisualElement styles here).
@@ -1181,6 +1216,10 @@ namespace BarGraph.Core
             bool hasSel  = _viewState.SelectedBars.Count > 0;
             float dimAlpha = _vis.DimOpacity;
 
+            // Per-bar visual provider — only for primary bars (not overlays).
+            // Cached ref avoids field access per iteration.
+            var barVisProv = useOverlay ? null : _barVisualProvider;
+
             for (int dispIdx = startDisp; dispIdx < endDisp; dispIdx++)
             {
                 int dataIdx = _viewState.DisplayToData[dispIdx];
@@ -1193,6 +1232,24 @@ namespace BarGraph.Core
                 float barAlpha = alpha;
                 if (hasSel && !_viewState.SelectedBars.Contains(dataIdx))
                     barAlpha *= dimAlpha;
+
+                // Query per-bar visual provider (zero-alloc: Nullable<struct> on stack)
+                Color32 colorOverride = default;
+                bool    hasColorOvr   = false;
+                if (barVisProv != null)
+                {
+                    BarVisualOverride? ovr = barVisProv.Invoke(dataIdx);
+                    if (ovr.HasValue)
+                    {
+                        if (ovr.Value.Alpha.HasValue)
+                            barAlpha *= ovr.Value.Alpha.Value;
+                        if (ovr.Value.Color.HasValue)
+                        {
+                            colorOverride = ovr.Value.Color.Value;
+                            hasColorOvr   = true;
+                        }
+                    }
+                }
 
                 // ── Segment-level LOD merge state (zero allocation) ─────────
                 // When consecutive segments are each < 1 px tall, accumulate
@@ -1213,10 +1270,12 @@ namespace BarGraph.Core
                     // correctly by drawTop/drawH below.
                     float segH = seg.Value * yScale;
 
+                    Color32 segColor = hasColorOvr ? colorOverride : seg.Color;
+
                     if (segH < 1f)
                     {
                         // Sub-pixel segment → accumulate into merge buffer.
-                        Color32 c = ResolveSegmentColor(seg.Color, barAlpha);
+                        Color32 c = ResolveSegmentColor(segColor, barAlpha);
                         if (seg.Value > mergeDomVal)
                         {
                             mergeDomVal = seg.Value;
@@ -1273,7 +1332,7 @@ namespace BarGraph.Core
                     float sDrawH   = Mathf.Min(yBottom, plotY2) - sDrawTop;
                     if (sDrawH < 0.5f) { yBottom = yTop; continue; }
 
-                    Color32 sc = ResolveSegmentColor(seg.Color, barAlpha);
+                    Color32 sc = ResolveSegmentColor(segColor, barAlpha);
                     AddQuad(sc, x, sDrawTop, bw, sDrawH);
                     yBottom = yTop;
                 }
@@ -1301,7 +1360,7 @@ namespace BarGraph.Core
             int startDisp, int endDisp,
             float plotX, float plotY2,
             float plotW, float plotH,
-            ChartDataModel model, float alpha)
+            ChartDataModel model, bool useOverlay, float alpha)
         {
             int pixelCount = Mathf.Max(1, Mathf.FloorToInt(plotW));
             int viewCount  = endDisp - startDisp;
@@ -1311,12 +1370,15 @@ namespace BarGraph.Core
 
             for (int px = 0; px < pixelCount; px++) _lodBuf[px] = default;
 
-            BarEntry[]   bars     = model.Bars;
-            BarSegment[] segments = model.Segments;
-            int          barCount = model.BarCount;
+            BarEntry[]   bars     = useOverlay ? model.OverlayBars     : model.Bars;
+            BarSegment[] segments = useOverlay ? model.OverlaySegments : model.Segments;
+            int          barCount = useOverlay ? model.OverlayBarCount  : model.BarCount;
 
             bool hasSel  = _viewState.SelectedBars.Count > 0;
             float dimAlpha = _vis.DimOpacity;
+
+            // Per-bar visual provider — only for primary bars (not overlays).
+            var barVisProv = useOverlay ? null : _barVisualProvider;
 
             for (int i = 0; i < viewCount; i++)
             {
@@ -1336,10 +1398,26 @@ namespace BarGraph.Core
                 float total = bar.TotalValue;
                 if (total > _lodBuf[px].MaxValue)
                 {
-                    Color32 c = bar.SegmentCount > 0
-                        ? ResolveSegmentColor(segments[bar.SegmentStart].Color, barAlpha)
-                        : ResolveSegmentColor(default, barAlpha);
-                    _lodBuf[px] = new LodPixel { MaxValue = total, Color = c };
+                    Color32 segColor = bar.SegmentCount > 0
+                        ? segments[bar.SegmentStart].Color : default;
+
+                    // Apply per-bar visual provider (only for winning bar)
+                    if (barVisProv != null)
+                    {
+                        BarVisualOverride? ovr = barVisProv.Invoke(dataIdx);
+                        if (ovr.HasValue)
+                        {
+                            if (ovr.Value.Alpha.HasValue)
+                                barAlpha *= ovr.Value.Alpha.Value;
+                            if (ovr.Value.LodColor.HasValue)
+                                segColor = ovr.Value.LodColor.Value;
+                            else if (ovr.Value.Color.HasValue)
+                                segColor = ovr.Value.Color.Value;
+                        }
+                    }
+
+                    Color32 c = ResolveSegmentColor(segColor, barAlpha);
+                    _lodBuf[px] = new LodPixel { MaxValue = total, Color = c, DataIndex = dataIdx };
                 }
             }
 
@@ -1524,6 +1602,33 @@ namespace BarGraph.Core
             // ── Selected segment highlight (persistent until next click) ────────
             int selSegBar = _viewState.SelectedSegmentBar;
             int selSegIdx = _viewState.SelectedSegmentIndex;
+
+            // In LOD mode, draw a marker column so the user can still see which
+            // bar has the selected segment even when zoomed out.
+            if (lodMode && _settings.ShowSegmentHighlightInLod
+                && selSegBar >= 0 && selSegBar < _model.BarCount)
+            {
+                int displayIdx = selSegBar < _viewState.DataToDisplay.Length
+                    ? _viewState.DataToDisplay[selSegBar] : selSegBar;
+                if (displayIdx >= startDisp && displayIdx <= endDisp)
+                {
+                    int viewCount = endDisp - startDisp;
+                    int pixelCount = Mathf.Max(1, Mathf.FloorToInt(plotW));
+                    float px = plotX + (float)(displayIdx - startDisp) * pixelCount / viewCount;
+
+                    p.fillColor = _vis.SelectionFillColor;
+                    p.BeginPath();
+                    PathRect(p, px, plotY2 - plotH, 1f, plotH);
+                    p.Fill();
+
+                    p.strokeColor = _vis.SegSelectionColor;
+                    p.lineWidth   = _vis.SegSelectionWidth;
+                    p.BeginPath();
+                    PathRect(p, px, plotY2 - plotH, 1f, plotH);
+                    p.Stroke();
+                }
+            }
+
             if (!lodMode && selSegBar >= 0 && selSegBar < _model.BarCount && selSegIdx >= 0)
             {
                 ref readonly BarEntry selBar = ref _model.Bars[selSegBar];
@@ -1975,6 +2080,11 @@ namespace BarGraph.Core
             MarkDirtyRepaint();
         }
 
+        private void OnOverlayChanged()
+        {
+            MarkDirtyRepaint();
+        }
+
         private void RecalcBounds()
         {
             _effectiveMaxY = _settings.MaxValue > 0f
@@ -2038,11 +2148,8 @@ namespace BarGraph.Core
                 int idxCount   = chunkQuads * INDICES_PER_QUAD;
 
                 // Pass Texture2D.whiteTexture so that texture × tint = tint.
-                // Must remap UVs into uvRegion in case the atlas repacks it.
                 MeshWriteData mwd = mgc.Allocate(vertCount, idxCount, Texture2D.whiteTexture);
-                Vector2 uv = new Vector2(
-                    mwd.uvRegion.x + mwd.uvRegion.width  * 0.5f,
-                    mwd.uvRegion.y + mwd.uvRegion.height * 0.5f);
+                Vector2 uv = new Vector2(0.5f, 0.5f);
 
                 for (int i = 0; i < chunkQuads; i++)
                 {
@@ -2159,6 +2266,7 @@ namespace BarGraph.Core
         {
             public float   MaxValue;
             public Color32 Color;
+            public int     DataIndex;
         }
 
         /// <summary>
@@ -2208,7 +2316,7 @@ namespace BarGraph.Core
     }
 
     /// <summary>
-    /// Event args for <see cref="BarGraphElement.SegmentClicked"/> and
+    /// Event args for segment interaction and
     /// <see cref="BarGraphElement.SegmentHoverChanged"/> events.
     /// </summary>
     public struct SegmentEventArgs

@@ -20,6 +20,7 @@ namespace BarGraph.ControlsDemo
         {
             Graph.AddHandler(new BarGraphHoverHandler());
             Graph.AddHandler(new BarGraphSelectionHandler());
+            Graph.AddHandler(new BarGraphKeyboardSelectionHandler());
         }
 
         protected override void WireStatusEvents()

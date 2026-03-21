@@ -147,7 +147,8 @@ namespace BarGraph.Runtime
 
             _graph.SetInputSource(new BarGraphUIToolkitInput());
             _graph.AddHandler(new BarGraphHoverHandler());
-            _graph.AddHandler(new BarGraphSelectionHandler());
+            var selHandler = new BarGraphSelectionHandler();
+            _graph.AddHandler(selHandler);
             _graph.AddHandler(new BarGraphPanHandler());
             _graph.AddHandler(new BarGraphZoomHandler());
 
@@ -158,7 +159,7 @@ namespace BarGraph.Runtime
             container.Add(_graph);
 
             // Wire up Unity events
-            _graph.BarClicked       += args => OnBarClicked?.Invoke(args.DataIndex);
+            selHandler.BarClicked   += args => OnBarClicked?.Invoke(args.DataIndex);
             _graph.SelectionChanged += args => OnSelectionChanged?.Invoke(args.SelectedDataIndices.Count);
 
             // Apply initial sort

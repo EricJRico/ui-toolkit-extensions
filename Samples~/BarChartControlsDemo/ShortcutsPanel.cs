@@ -23,6 +23,7 @@ namespace BarGraph.ControlsDemo
         {
             Graph.AddHandler(new BarGraphHoverHandler());
             Graph.AddHandler(new BarGraphSelectionHandler());
+            Graph.AddHandler(new BarGraphKeyboardSelectionHandler());
             Graph.AddHandler(new BarGraphZoomHandler());
             Graph.AddHandler(new BarGraphPanHandler());
             Graph.AddHandler(new BarGraphKeyboardNavigationHandler());

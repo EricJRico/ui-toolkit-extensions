@@ -80,6 +80,7 @@ namespace BarGraph.Demo
             Graph.SetInputSource(new BarGraphUIToolkitInput());
             Graph.AddHandler(new BarGraphHoverHandler());
             Graph.AddHandler(new BarGraphSelectionHandler());
+            Graph.AddHandler(new BarGraphKeyboardSelectionHandler());
             Graph.AddHandler(new BarGraphPanHandler());
             Graph.AddHandler(new BarGraphZoomHandler());
             Graph.FormatYLabel = v => v >= 1000f ? $"{v / 1000f:F1}K" : $"{v:F0}";

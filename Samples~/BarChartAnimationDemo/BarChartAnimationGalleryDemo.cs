@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 using BarGraph.Events;
+using BarGraph.Input.Handlers;
 
 namespace BarGraph.AnimationDemo
 {
@@ -139,10 +140,11 @@ namespace BarGraph.AnimationDemo
         private void WireEvents(AnimationDemoPanel panel)
         {
             var name = panel.Title;
-            panel.Graph.BarClicked       += a => Log($"[{name}] BarClicked  data={a.DataIndex} val={a.TotalValue:F1}");
+            var sel = panel.Graph.GetHandler<BarGraphSelectionHandler>();
+            sel.BarClicked               += a => Log($"[{name}] BarClicked  data={a.DataIndex} val={a.TotalValue:F1}");
             panel.Graph.HoverChanged     += a => { if (a.DataIndex >= 0) Log($"[{name}] Hover  bar={a.DataIndex}"); };
             panel.Graph.SelectionChanged += a => Log($"[{name}] Selection  count={a.SelectedDataIndices.Count}");
-            panel.Graph.DragCompleted    += a => Log($"[{name}] DragDone  selected={a.SelectedDataIndices.Count}");
+            sel.DragCompleted            += a => Log($"[{name}] DragDone  selected={a.SelectedDataIndices.Count}");
         }
 
         private void Log(string msg)

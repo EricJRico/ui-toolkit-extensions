@@ -33,5 +33,4 @@
     font-size: 9px;
     -unity-font-style: italic;
     letter-spacing: 2px;
-    text-transform: uppercase;
 }

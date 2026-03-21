@@ -90,35 +90,4 @@ namespace BarGraph.Events
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  Visual-tree event types (bubble through UI hierarchy)
-    //  Pool-safe: Unity calls GetPooled() internally.
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Visual-tree event that bubbles so ancestor elements can respond.
-    /// Use in addition to the <c>Action&lt;BarClickedEventArgs&gt;</c> delegate
-    /// when you need parent elements to intercept clicks.
-    /// </summary>
-    public sealed class BarClickedUIEvent : EventBase<BarClickedUIEvent>
-    {
-        public int   DataIndex    { get; private set; }
-        public float TotalValue   { get; private set; }
-
-        /// <summary>
-        /// Override so this event bubbles up the visual tree by default.
-        /// <c>bubbles</c> is a getter-only property on <see cref="EventBase"/>; we
-        /// shadow it here rather than attempting to assign it after construction.
-        /// </summary>
-        public new bool bubbles => true;
-
-        public static BarClickedUIEvent GetPooled(int dataIndex, float value)
-        {
-            var e = EventBase<BarClickedUIEvent>.GetPooled();
-            e.DataIndex  = dataIndex;
-            e.TotalValue = value;
-            // bubbles is declared above as 'true'; no assignment needed.
-            return e;
-        }
-    }
 }
