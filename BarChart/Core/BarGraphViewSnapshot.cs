@@ -31,6 +31,10 @@ namespace BarGraph.Core
         /// </summary>
         public int[]    SelectedBars;
 
+        // ── Segment selection ─────────────────────────────────────────────
+        public int      SelectedSegmentBar;
+        public int      SelectedSegmentIndex;
+
         // ── Validity ────────────────────────────────────────────────────────
         /// <summary>
         /// Distinguishes a real captured snapshot from a default-initialized struct.

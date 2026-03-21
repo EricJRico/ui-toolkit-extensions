@@ -557,9 +557,11 @@ namespace BarGraph.Core
                 PanY            = _viewState.PanY,
                 SortMode        = _viewState.SortMode,
                 SortDescending  = _viewState.SortDescending,
-                FocusedBarIndex = _viewState.FocusedBarIndex,
-                SelectedBars    = selected,
-                IsValid         = true,
+                FocusedBarIndex      = _viewState.FocusedBarIndex,
+                SelectedBars         = selected,
+                SelectedSegmentBar   = _viewState.SelectedSegmentBar,
+                SelectedSegmentIndex = _viewState.SelectedSegmentIndex,
+                IsValid              = true,
             };
         }
 
@@ -589,8 +591,10 @@ namespace BarGraph.Core
             // Direct mutation for bulk restore — avoids N SelectionChanged events.
             // Single FireSelectionChanged() call below covers the state change.
             _viewState.SelectedBars.Clear();
-            _viewState.SelectedSegmentBar   = -1;
-            _viewState.SelectedSegmentIndex = -1;
+            _viewState.SelectedSegmentBar   = (snap.SelectedSegmentBar >= 0 && snap.SelectedSegmentBar < barCount)
+                ? snap.SelectedSegmentBar : -1;
+            _viewState.SelectedSegmentIndex = (_viewState.SelectedSegmentBar >= 0)
+                ? snap.SelectedSegmentIndex : -1;
             if (snap.SelectedBars != null)
             {
                 for (int i = 0; i < snap.SelectedBars.Length; i++)
