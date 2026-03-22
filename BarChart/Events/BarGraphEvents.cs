@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BarGraph.Core;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -76,17 +77,21 @@ namespace BarGraph.Events
         }
     }
 
-    /// <summary>Fired when zoom or pan changes.</summary>
+    /// <summary>Fired when zoom, pan, or sort changes.</summary>
     public readonly struct ViewChangedEventArgs
     {
         public readonly float ZoomX;
         public readonly float ZoomY;
         public readonly float PanX;
         public readonly float PanY;
+        public readonly SortMode SortMode;
+        public readonly bool SortDescending;
 
-        public ViewChangedEventArgs(float zx, float zy, float px, float py)
+        public ViewChangedEventArgs(float zx, float zy, float px, float py,
+            SortMode sortMode = SortMode.None, bool sortDescending = true)
         {
             ZoomX = zx; ZoomY = zy; PanX = px; PanY = py;
+            SortMode = sortMode; SortDescending = sortDescending;
         }
     }
 

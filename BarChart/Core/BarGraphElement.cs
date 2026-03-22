@@ -516,6 +516,7 @@ namespace BarGraph.Core
             _viewState.SortMode       = mode;
             _viewState.SortDescending = descending;
             _viewState.SortDirty      = true;
+            NotifyViewChanged();
             MarkDirtyRepaint();
         }
 
@@ -2111,7 +2112,8 @@ namespace BarGraph.Core
         {
             ViewChanged?.Invoke(new ViewChangedEventArgs(
                 _viewState.ZoomX, _viewState.ZoomY,
-                _viewState.PanX,  _viewState.PanY));
+                _viewState.PanX,  _viewState.PanY,
+                _viewState.SortMode, _viewState.SortDescending));
         }
 
         private void FireSelectionChanged()

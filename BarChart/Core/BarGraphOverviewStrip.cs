@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -199,12 +200,24 @@ namespace BarGraph.Core
         /// <summary>Remove all bars and segments.</summary>
         public void ClearData() => _innerChart.ClearData();
 
+        /// <summary>Per-bar visual override forwarded to the inner chart.</summary>
+        public Func<int, BarVisualOverride?> BarVisualProvider
+        {
+            get => _innerChart.BarVisualProvider;
+            set => _innerChart.BarVisualProvider = value;
+        }
+
+
+
         // ─────────────────────────────────────────────────────────────────────
         //  Viewport indicator sync
         // ─────────────────────────────────────────────────────────────────────
 
         private void OnSourceViewChanged(ViewChangedEventArgs args)
-            => SyncIndicator(args.ZoomX, args.PanX);
+        {
+            _innerChart.SetSortMode(args.SortMode, args.SortDescending);
+            SyncIndicator(args.ZoomX, args.PanX);
+        }
 
         private void SyncIndicator(float zoomX, float panX)
         {
