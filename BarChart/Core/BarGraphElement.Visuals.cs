@@ -45,11 +45,14 @@ namespace BarGraph.Core
         XLabelOffsetY       = 1u << 25,
         YLabelGap           = 1u << 26,
         DimOpacity          = 1u << 27,
+        TagHighlightTint         = 1u << 28,
+        TagHighlightOutline      = 1u << 29,
+        TagHighlightOutlineWidth = 1u << 30,
 
         // ── Convenience masks ───────────────────────────────────────────────
-        AllColors           = 0x0FFFu,
-        AllFloats           = 0x0FFF_F000u,
-        All                 = 0x0FFF_FFFFu,
+        AllColors           = 0x3000_0FFFu,  // bits 0–11, 28–29
+        AllFloats           = 0x4FFF_F000u,  // bits 12–27, 30
+        All                 = 0x7FFF_FFFFu,  // bits 0–30
     }
 
     public sealed partial class BarGraphElement
@@ -76,6 +79,8 @@ namespace BarGraph.Core
             DragRectBorderColor= new Color(0.35f, 0.65f, 1.00f, 0.60f),
             FocusRimColor      = new Color(1.00f, 0.80f, 0.20f, 1.00f),
             OverlayTint        = new Color(1.00f, 1.00f, 1.00f, 0.38f),
+            TagHighlightTint   = new Color(1.00f, 1.00f, 1.00f, 0.22f),
+            TagHighlightOutline = new Color(0f, 0f, 0f, 0f),
 
             SelectionRimWidth  = 1.5f,
             SegSelectionWidth  = 2.5f,
@@ -90,6 +95,7 @@ namespace BarGraph.Core
             PaddingBottom      = 32f,
             LabelHeight        = 18f,
             DimOpacity         = 1f,
+            TagHighlightOutlineWidth = 0f,
             XLabelWidth        = 40f,
             XLabelOffsetY      = 3f,
             YLabelGap          = 4f,
@@ -132,6 +138,8 @@ namespace BarGraph.Core
             VisualProperty.DragRectBorderColor => DefaultVisuals.DragRectBorderColor,
             VisualProperty.FocusRimColor       => DefaultVisuals.FocusRimColor,
             VisualProperty.OverlayTint         => DefaultVisuals.OverlayTint,
+            VisualProperty.TagHighlightTint    => DefaultVisuals.TagHighlightTint,
+            VisualProperty.TagHighlightOutline => DefaultVisuals.TagHighlightOutline,
             _ => Color.magenta,
         };
 
@@ -152,7 +160,8 @@ namespace BarGraph.Core
             VisualProperty.XLabelWidth       => DefaultVisuals.XLabelWidth,
             VisualProperty.XLabelOffsetY     => DefaultVisuals.XLabelOffsetY,
             VisualProperty.YLabelGap         => DefaultVisuals.YLabelGap,
-            VisualProperty.DimOpacity        => DefaultVisuals.DimOpacity,
+            VisualProperty.DimOpacity               => DefaultVisuals.DimOpacity,
+            VisualProperty.TagHighlightOutlineWidth => DefaultVisuals.TagHighlightOutlineWidth,
             _ => 0f,
         };
 
@@ -261,6 +270,20 @@ namespace BarGraph.Core
         {
             get => _vis.OverlayTint;
             set => SetColorOverride(VisualProperty.OverlayTint, ref _vis.OverlayTint, value);
+        }
+
+        /// <summary>Tint fill applied to segments matching <see cref="HighlightedTag"/>. Use <see cref="ResetToUSS"/> to revert.</summary>
+        public Color VisTagHighlightTint
+        {
+            get => _vis.TagHighlightTint;
+            set => SetColorOverride(VisualProperty.TagHighlightTint, ref _vis.TagHighlightTint, value);
+        }
+
+        /// <summary>Outline colour for segments matching <see cref="HighlightedTag"/>. Transparent = disabled. Use <see cref="ResetToUSS"/> to revert.</summary>
+        public Color VisTagHighlightOutline
+        {
+            get => _vis.TagHighlightOutline;
+            set => SetColorOverride(VisualProperty.TagHighlightOutline, ref _vis.TagHighlightOutline, value);
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -403,6 +426,13 @@ namespace BarGraph.Core
         {
             get => _vis.DimOpacity;
             set => SetFloatOverride(VisualProperty.DimOpacity, ref _vis.DimOpacity, value, 0f, 1f);
+        }
+
+        /// <summary>Outline width (px) for segments matching <see cref="HighlightedTag"/>. 0 = disabled. Use <see cref="ResetToUSS"/> to revert.</summary>
+        public float VisTagHighlightOutlineWidth
+        {
+            get => _vis.TagHighlightOutlineWidth;
+            set => SetFloatOverride(VisualProperty.TagHighlightOutlineWidth, ref _vis.TagHighlightOutlineWidth, value, 0f);
         }
 
         // ─────────────────────────────────────────────────────────────────────

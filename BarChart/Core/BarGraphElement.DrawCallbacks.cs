@@ -88,5 +88,23 @@ namespace BarGraph.Core
             get => _barVisualProvider;
             set { _barVisualProvider = value; MarkDirtyRepaint(); }
         }
+
+        // ─────────────────────────────────────────────────────────────────────
+        //  Per-bar tag highlight filter
+        // ─────────────────────────────────────────────────────────────────────
+
+        private Func<int, bool> _tagHighlightFilter;
+
+        /// <summary>
+        /// Optional filter queried per visible bar during tag highlight rendering
+        /// (tint and outline). Receives the data index; return <c>true</c> to apply
+        /// tag highlighting, <c>false</c> to skip.
+        /// <para>When <c>null</c> (default), all bars participate in tag highlighting.</para>
+        /// </summary>
+        public Func<int, bool> TagHighlightFilter
+        {
+            get => _tagHighlightFilter;
+            set { _tagHighlightFilter = value; MarkDirtyRepaint(); }
+        }
     }
 }

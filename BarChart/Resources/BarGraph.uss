@@ -21,6 +21,8 @@
     --bar-graph-drag-rect-border-color:  rgba(89, 166, 255, 0.6);
     --bar-graph-focus-rim-color:         rgb(255, 204, 51);
     --bar-graph-overlay-tint:            rgba(255, 255, 255, 0.38);
+    --bar-graph-tag-highlight-tint:      rgba(255, 255, 255, 0.22);
+    --bar-graph-tag-highlight-outline:   rgba(0, 0, 0, 0);
 
     /* ── Chrome geometry ───────────────────────────────────────────── */
     --bar-graph-selection-rim-width:     1.5;
@@ -30,6 +32,7 @@
     --bar-graph-grid-line-width:         1;
     --bar-graph-axis-line-width:         1.5;
     --bar-graph-dim-opacity:             1;
+    --bar-graph-tag-highlight-outline-width: 0;
 
     /* ── Padding (plot-area insets) ────────────────────────────────── */
     --bar-graph-padding-left:            52;

@@ -54,6 +54,8 @@ namespace BarGraph.Core
         static readonly CustomStyleProperty<Color> k_DragRectBorderColor  = new("--bar-graph-drag-rect-border-color");
         static readonly CustomStyleProperty<Color> k_FocusRimColor        = new("--bar-graph-focus-rim-color");
         static readonly CustomStyleProperty<Color> k_OverlayTint          = new("--bar-graph-overlay-tint");
+        static readonly CustomStyleProperty<Color> k_TagHighlightTint     = new("--bar-graph-tag-highlight-tint");
+        static readonly CustomStyleProperty<Color> k_TagHighlightOutline  = new("--bar-graph-tag-highlight-outline");
 
         // Floats
         static readonly CustomStyleProperty<float> k_SelectionRimWidth    = new("--bar-graph-selection-rim-width");
@@ -72,6 +74,7 @@ namespace BarGraph.Core
         static readonly CustomStyleProperty<float> k_XLabelOffsetY        = new("--bar-graph-x-label-offset-y");
         static readonly CustomStyleProperty<float> k_YLabelGap            = new("--bar-graph-y-label-gap");
         static readonly CustomStyleProperty<float> k_DimOpacity           = new("--bar-graph-dim-opacity");
+        static readonly CustomStyleProperty<float> k_TagHighlightOutlineWidth = new("--bar-graph-tag-highlight-outline-width");
 
         // ─────────────────────────────────────────────────────────────────────
         //  Resolved visual cache  (populated from USS, read by draw methods)
@@ -91,6 +94,8 @@ namespace BarGraph.Core
             public Color DragRectBorderColor;
             public Color FocusRimColor;
             public Color OverlayTint;
+            public Color TagHighlightTint;
+            public Color TagHighlightOutline;
 
             public float SelectionRimWidth;
             public float SegSelectionWidth;
@@ -104,6 +109,7 @@ namespace BarGraph.Core
             public float XLabelWidth, XLabelOffsetY;
             public float YLabelGap;
             public float DimOpacity;
+            public float TagHighlightOutlineWidth;
         }
 
         private ResolvedVisuals _vis = new ResolvedVisuals
@@ -122,6 +128,8 @@ namespace BarGraph.Core
             DragRectBorderColor= new Color(0.35f, 0.65f, 1.00f, 0.60f),
             FocusRimColor      = new Color(1.00f, 0.80f, 0.20f, 1.00f),
             OverlayTint        = new Color(1.00f, 1.00f, 1.00f, 0.38f),
+            TagHighlightTint   = new Color(1.00f, 1.00f, 1.00f, 0.22f),
+            TagHighlightOutline = new Color(0f, 0f, 0f, 0f),
 
             SelectionRimWidth  = 1.5f,
             SegSelectionWidth  = 2.5f,
@@ -136,6 +144,7 @@ namespace BarGraph.Core
             PaddingBottom      = 32f,
             LabelHeight        = 18f,
             DimOpacity         = 1f,
+            TagHighlightOutlineWidth = 0f,
             XLabelWidth        = 40f,
             XLabelOffsetY      = 3f,
             YLabelGap          = 4f,
@@ -292,6 +301,8 @@ namespace BarGraph.Core
             TryResolveColor(k_DragRectFillColor,   VisualProperty.DragRectFillColor,   ref _vis.DragRectFillColor);
             TryResolveColor(k_DragRectBorderColor,  VisualProperty.DragRectBorderColor, ref _vis.DragRectBorderColor);
             TryResolveColor(k_OverlayTint,          VisualProperty.OverlayTint,         ref _vis.OverlayTint);
+            TryResolveColor(k_TagHighlightTint,     VisualProperty.TagHighlightTint,    ref _vis.TagHighlightTint);
+            TryResolveColor(k_TagHighlightOutline,  VisualProperty.TagHighlightOutline, ref _vis.TagHighlightOutline);
 
             // Floats — skipped when a C# override is active for that property
             TryResolveFloat(k_SelectionRimWidth,   VisualProperty.SelectionRimWidth,   ref _vis.SelectionRimWidth);
@@ -310,6 +321,7 @@ namespace BarGraph.Core
             TryResolveFloat(k_XLabelOffsetY,       VisualProperty.XLabelOffsetY,       ref _vis.XLabelOffsetY);
             TryResolveFloat(k_YLabelGap,           VisualProperty.YLabelGap,           ref _vis.YLabelGap);
             TryResolveFloat(k_DimOpacity,          VisualProperty.DimOpacity,          ref _vis.DimOpacity);
+            TryResolveFloat(k_TagHighlightOutlineWidth, VisualProperty.TagHighlightOutlineWidth, ref _vis.TagHighlightOutlineWidth);
 
             RebuildLabelPool();
             MarkDirtyRepaint();
@@ -562,6 +574,7 @@ namespace BarGraph.Core
                 SelectedBars         = selected,
                 SelectedSegmentBar   = _viewState.SelectedSegmentBar,
                 SelectedSegmentIndex = _viewState.SelectedSegmentIndex,
+                HighlightedTag       = _viewState.HighlightedTag,
                 IsValid              = true,
             };
         }
@@ -596,6 +609,7 @@ namespace BarGraph.Core
                 ? snap.SelectedSegmentBar : -1;
             _viewState.SelectedSegmentIndex = (_viewState.SelectedSegmentBar >= 0)
                 ? snap.SelectedSegmentIndex : -1;
+            _viewState.HighlightedTag = snap.HighlightedTag;
             if (snap.SelectedBars != null)
             {
                 for (int i = 0; i < snap.SelectedBars.Length; i++)
@@ -796,6 +810,26 @@ namespace BarGraph.Core
             FireSelectionChanged();
             MarkDirtyRepaint();
         }
+
+        /// <summary>
+        /// Highlights all segments across all bars whose <see cref="BarSegment.Tag"/>
+        /// matches the given value.  Set to -1 to clear.  Opt-in: default is -1 (no highlight).
+        /// </summary>
+        public void HighlightTag(int tag)
+        {
+            _viewState.HighlightedTag = tag;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>Clears the tag highlight. Equivalent to <c>HighlightTag(-1)</c>.</summary>
+        public void ClearTagHighlight()
+        {
+            _viewState.HighlightedTag = -1;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>Currently highlighted tag, or -1 if none.</summary>
+        public int HighlightedTag => _viewState.HighlightedTag;
 
         /// <summary>
         /// Clears segment selection without affecting bar selection (dimming).
@@ -1104,6 +1138,7 @@ namespace BarGraph.Core
                         ? viewCount * Mathf.CeilToInt(plotH)
                         : Mathf.CeilToInt(plotW);
                     if (_model.HasOverlay) estimatedQuads *= 2;
+                    if (_viewState.HighlightedTag >= 0) estimatedQuads += estimatedQuads / 4;
                     if (_quadBuf.Length < estimatedQuads)
                         _quadBuf = new QuadData[Mathf.Max(_quadBuf.Length * 2, estimatedQuads)];
                 }
@@ -1120,11 +1155,14 @@ namespace BarGraph.Core
             }
 
             // 5 – Overlay bars (same position mapping, tinted alpha)
+            // When a tag highlight is active and bars are in direct mode (segments visible),
+            // skip the overlay — the segment-level tint provides the same information.
             if (_model.HasOverlay && _model.BarCount > 0)
             {
                 int viewCount = ctxEnd - ctxStart;
+                bool suppressOverlay = _viewState.HighlightedTag >= 0 && ctxStride >= 1f;
 
-                if (viewCount > 0)
+                if (viewCount > 0 && !suppressOverlay)
                 {
                     if (ctxStride >= 1f)
                         DrawDirectBars(ctxStart, ctxEnd, plotX, plotY2, ctxStride, ctxBarW,
@@ -1221,6 +1259,12 @@ namespace BarGraph.Core
             bool hasSel  = _viewState.SelectedBars.Count > 0;
             float dimAlpha = _vis.DimOpacity;
 
+            // Tag highlight — cached outside loop for zero per-iteration field access
+            int highlightTag = useOverlay ? -1 : _viewState.HighlightedTag;
+            Color32 tagTint  = (Color32)_vis.TagHighlightTint;
+            bool hasTagTint  = highlightTag >= 0 && tagTint.a > 0;
+            var tagFilter    = hasTagTint ? _tagHighlightFilter : null;
+
             // Per-bar visual provider — only for primary bars (not overlays).
             // Cached ref avoids field access per iteration.
             var barVisProv = useOverlay ? null : _barVisualProvider;
@@ -1237,6 +1281,7 @@ namespace BarGraph.Core
                 float barAlpha = alpha;
                 if (hasSel && !_viewState.SelectedBars.Contains(dataIdx))
                     barAlpha *= dimAlpha;
+                bool barTagTint = hasTagTint && (tagFilter == null || tagFilter.Invoke(dataIdx));
 
                 // Query per-bar visual provider (zero-alloc: Nullable<struct> on stack)
                 Color32 colorOverride = default;
@@ -1265,6 +1310,7 @@ namespace BarGraph.Core
                 float   mergeH      = 0f;
                 Color32 mergeColor  = default;
                 float   mergeDomVal = 0f;
+                int     mergeDomTag = -1;
 
                 for (int s = 0; s < bar.SegmentCount; s++)
                 {
@@ -1285,6 +1331,7 @@ namespace BarGraph.Core
                         {
                             mergeDomVal = seg.Value;
                             mergeColor  = c;
+                            mergeDomTag = seg.Tag;
                         }
                         mergeH += segH;
 
@@ -1297,12 +1344,17 @@ namespace BarGraph.Core
                                 float drawTop = Mathf.Max(mYTop, plotTop);
                                 float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
                                 if (drawH >= 0.5f)
+                                {
                                     AddQuad(mergeColor, x, drawTop, bw, drawH);
+                                    if (barTagTint && mergeDomTag == highlightTag)
+                                        AddQuad(tagTint, x, drawTop, bw, drawH);
+                                }
                             }
                             yBottom     = mYTop;
                             mergeH      = 0f;
                             mergeDomVal = 0f;
                             mergeColor  = default;
+                            mergeDomTag = -1;
 
                             if (yBottom <= plotTop) break;
                         }
@@ -1318,12 +1370,17 @@ namespace BarGraph.Core
                             float drawTop = Mathf.Max(mYTop, plotTop);
                             float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
                             if (drawH >= 0.5f)
+                            {
                                 AddQuad(mergeColor, x, drawTop, bw, drawH);
+                                if (barTagTint && mergeDomTag == highlightTag)
+                                    AddQuad(tagTint, x, drawTop, bw, drawH);
+                            }
                         }
                         yBottom     = mYTop;
                         mergeH      = 0f;
                         mergeDomVal = 0f;
                         mergeColor  = default;
+                        mergeDomTag = -1;
 
                         if (yBottom <= plotTop) break;
                     }
@@ -1339,6 +1396,8 @@ namespace BarGraph.Core
 
                     Color32 sc = ResolveSegmentColor(segColor, barAlpha);
                     AddQuad(sc, x, sDrawTop, bw, sDrawH);
+                    if (barTagTint && seg.Tag == highlightTag)
+                        AddQuad(tagTint, x, sDrawTop, bw, sDrawH);
                     yBottom = yTop;
                 }
 
@@ -1351,7 +1410,11 @@ namespace BarGraph.Core
                         float drawTop = Mathf.Max(mYTop, plotTop);
                         float drawH   = Mathf.Min(yBottom, plotY2) - drawTop;
                         if (drawH >= 0.5f)
+                        {
                             AddQuad(mergeColor, x, drawTop, bw, drawH);
+                            if (barTagTint && mergeDomTag == highlightTag)
+                                AddQuad(tagTint, x, drawTop, bw, drawH);
+                        }
                     }
                 }
             }
@@ -1674,6 +1737,52 @@ namespace BarGraph.Core
                         yBottom -= segH;
                     }
                 }
+            }
+
+            // ── Tag highlight outline — all matching segments across visible bars ──
+            // Disabled by default (outline width 0, transparent color). Only runs
+            // when explicitly opted in via USS or C#.
+            int tagHL = _viewState.HighlightedTag;
+            float tagOutW = _vis.TagHighlightOutlineWidth;
+            if (!lodMode && tagHL >= 0 && tagOutW > 0f && _vis.TagHighlightOutline.a > 0f)
+            {
+                p.strokeColor = _vis.TagHighlightOutline;
+                p.lineWidth   = tagOutW;
+                p.BeginPath();
+
+                float yScale  = plotH / _effectiveMaxY * _viewState.ZoomY;
+                float yOffset = _viewState.PanY * plotH;
+                var tagFilter = _tagHighlightFilter;
+
+                for (int dispIdx = startDisp; dispIdx < endDisp; dispIdx++)
+                {
+                    int dataIdx = _viewState.DisplayToData[dispIdx];
+                    if (dataIdx >= _model.BarCount) continue;
+                    if (tagFilter != null && !tagFilter.Invoke(dataIdx)) continue;
+
+                    ref readonly BarEntry bar = ref _model.Bars[dataIdx];
+                    SnapBarX(dispIdx, plotX, stride, barW, out float bx, out float bWidth);
+                    float yBottom = plotY2 + yOffset;
+
+                    for (int s = 0; s < bar.SegmentCount; s++)
+                    {
+                        ref readonly BarSegment seg = ref _model.Segments[bar.SegmentStart + s];
+                        float segH = seg.Value * yScale;
+                        if (seg.Tag == tagHL)
+                        {
+                            float yTop    = yBottom - segH;
+                            float drawTop = Mathf.Max(yTop, plotY2 - plotH);
+                            float drawBot = Mathf.Min(yBottom, plotY2);
+                            float drawH   = drawBot - drawTop;
+                            if (drawH >= 0.5f)
+                                PathRect(p, bx, drawTop, bWidth, drawH);
+                        }
+                        yBottom -= segH;
+                        if (yBottom <= plotY2 - plotH) break;
+                    }
+                }
+
+                p.Stroke();
             }
 
             // ── Hovered segment highlight — single segment rect + outline ────────

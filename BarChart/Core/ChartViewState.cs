@@ -75,6 +75,9 @@ namespace BarGraph.Core
         /// <summary>Segment index within the selected bar's segment array, or -1.</summary>
         public int SelectedSegmentIndex = -1;
 
+        /// <summary>Tag value to highlight across all bars, or -1 for none.</summary>
+        public int HighlightedTag = -1;
+
         // ── Sort ──────────────────────────────────────────────────────────────
 
         public SortMode SortMode = SortMode.None;

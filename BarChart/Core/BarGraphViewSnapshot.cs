@@ -35,6 +35,9 @@ namespace BarGraph.Core
         public int      SelectedSegmentBar;
         public int      SelectedSegmentIndex;
 
+        // ── Tag highlight ─────────────────────────────────────────────────
+        public int      HighlightedTag;
+
         // ── Validity ────────────────────────────────────────────────────────
         /// <summary>
         /// Distinguishes a real captured snapshot from a default-initialized struct.
